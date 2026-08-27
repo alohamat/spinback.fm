@@ -17,7 +17,6 @@ withDefaults(defineProps<VinylPlayerProps>(), {
   year: '1974',
   primaryColor: '#8e44ad',
   secondaryColor: '#e67e22',
-  tertiaryColor: '',
 })
 
 const isPlaying = ref(true)
