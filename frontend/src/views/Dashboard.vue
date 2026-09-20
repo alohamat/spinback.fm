@@ -27,7 +27,7 @@ function pickDistinctColors(palette: Color[], count = 3): Color[] {
 }
 
 const imagem = new Image()
-imagem.src = '/closetotheedge.webp'
+imagem.src = '/mirage.webp'
 imagem.onload = () => {
   const raw = getPaletteSync(imagem, { colorCount: 8 })
   if (!raw) return

@@ -19,9 +19,13 @@ const TIP_X   = 0.15
 const TIP_Y   = 0.98
 const PIVOT_X = 0.72
 const PIVOT_Y = 0.15
-const DISC_R  = 0.88   // borda do vinil
+const DISC_R  = 0.705   // borda do vinil
 const LABEL_R = 0.17   // borda do label central (área não tocável)
 const DEBUG   = false
+
+const DRIFT_SPEED = 5
+const CENTER_X = 0.6 
+const CENTER_Y = 0.50
 // ────────────────────────────────────────────────────────────────────────
 
 const containerRef = ref<HTMLDivElement | null>(null)
@@ -35,15 +39,32 @@ const vinylAngle = ref(0)
 let rAF: number | null = null
 let lastTime: DOMHighResTimeStamp | null = null
 
+function tick(t: DOMHighResTimeStamp) {
+  if (lastTime !== null) {
+    const dt = t - lastTime
+    // 1. Gira o vinil
+    vinylAngle.value = (vinylAngle.value + (360 / 3000) * dt) % 360
+
+    // 2. Se a agulha está solta e tocando no disco, move ela para o centro
+    if (isTouching.value && !isDragging.value) {
+      angle.value += (DRIFT_SPEED / 1000) * dt
+      checkCollision() // Verifica se a agulha chegou no selo central (fim do disco)
+    }
+  }
+
+  // Só continua o loop se ainda estiver tocando
+  if (isTouching.value) {
+    lastTime = t
+    rAF = requestAnimationFrame(tick)
+  } else {
+    rAF = null
+    lastTime = null
+  }
+}
+
 function startSpinning() {
   if (rAF !== null) return
   lastTime = null
-  function tick(t: DOMHighResTimeStamp) {
-    if (lastTime !== null)
-      vinylAngle.value = (vinylAngle.value + (360 / 3000) * (t - lastTime)) % 360
-    lastTime = t
-    rAF = requestAnimationFrame(tick)
-  }
   rAF = requestAnimationFrame(tick)
 }
 
@@ -57,15 +78,27 @@ function stopSpinning() {
 const trackProgress = ref(0)
 
 function updateProgress() {
-  if (!containerRef.value || !isTouching.value) return
+  if (!containerRef.value) return
+
+  // Se a agulha não estiver tocando, a barra volta para 0%
+  if (!isTouching.value) {
+    trackProgress.value = 0
+    return
+  }
+
   const tip = calcTip()
   const w = containerRef.value.offsetWidth
-  const dist = Math.hypot(tip.x - w / 2, tip.y - w / 2)
+  const h = containerRef.value.offsetHeight
+  
+  const centerX = w * CENTER_X
+  const centerY = h * CENTER_Y
+  const dist = Math.hypot(tip.x - centerX, tip.y - centerY)
+  
   const outerR = (w / 2) * DISC_R
   const innerR = (w / 2) * LABEL_R
   const p = (outerR - dist) / (outerR - innerR)
-  trackProgress.value = Math.min(180, Math.max(0, p * 180))
-  console.log(trackProgress.value)
+  
+  trackProgress.value = Math.min(100, Math.max(0, p * 100))
 }
 
 // ─── Agulha ─────────────────────────────────────────────────────────────
@@ -97,8 +130,17 @@ function checkCollision() {
   if (!containerRef.value) return
   const tip  = calcTip()
   const w    = containerRef.value.offsetWidth
-  const dist = Math.hypot(tip.x - w / 2, tip.y - w / 2)
-  const now  = dist <= (w / 2) * DISC_R
+  const h    = containerRef.value.offsetHeight
+  
+  // Usa a nova calibração
+  const centerX = w * CENTER_X
+  const centerY = h * CENTER_Y
+  const dist = Math.hypot(tip.x - centerX, tip.y - centerY)
+  
+  const outerR = (w / 2) * DISC_R
+  const innerR = (w / 2) * LABEL_R
+
+  const now = dist <= outerR && dist > innerR
 
   if (now && !isTouching.value) {
     isTouching.value = true
@@ -107,7 +149,7 @@ function checkCollision() {
   } else if (!now && isTouching.value) {
     isTouching.value = false
     stopSpinning()
-    console.log('🔇 Saiu do disco')
+    console.log('🔇 Saiu do disco (ou chegou no fim!)')
   }
 
   updateProgress()
@@ -116,6 +158,14 @@ function checkCollision() {
 // Debug
 const debugTip   = computed(() => DEBUG ? calcTip() : null)
 const debugPivot = computed(() => DEBUG ? { ...pivotPos.value } : null)
+
+const debugCenter = computed(() => {
+  if (!DEBUG || !containerRef.value) return null
+  return {
+    x: containerRef.value.offsetWidth * CENTER_X,
+    y: containerRef.value.offsetHeight * CENTER_Y
+  }
+})
 
 // ─── Drag ────────────────────────────────────────────────────────────────
 function onMouseDown(e: MouseEvent) { isDragging.value = true; e.preventDefault() }
@@ -141,7 +191,7 @@ function initNeedle() {
   if (!nw || !nh) return
 
   needleSize.value = { w: nw, h: nh }
-  pivotPos.value   = { x: cw * 1, y: ch * 0 }
+  pivotPos.value   = { x: cw * 0.8, y: ch * 0 }
 
   const restX = cw * 1.25
   const restY = ch * 0.85
@@ -225,6 +275,10 @@ onUnmounted(() => {
         <div v-if="debugPivot"
           class="absolute w-3 h-3 rounded-full bg-blue-500 z-20 pointer-events-none -translate-x-1/2 -translate-y-1/2"
           :style="{ left: `${debugPivot.x}px`, top: `${debugPivot.y}px` }"
+        />
+        <div v-if="debugCenter"
+          class="absolute w-3 h-3 rounded-full bg-green-500 z-20 pointer-events-none -translate-x-1/2 -translate-y-1/2"
+          :style="{ left: `${debugCenter.x}px`, top: `${debugCenter.y}px` }"
         />
       </template>
     </div>
