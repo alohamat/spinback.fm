@@ -2,17 +2,44 @@
 import VinylPlayer from '@/components/VinylPlayer.vue'
 import { getPaletteSync } from 'colorthief'
 import type { Color } from 'colorthief'
-import { reactive } from 'vue'
+import { ref, onMounted, onUnmounted, reactive, watch } from 'vue'
+import { getPlaybackState, play, pause, seek } from '@/services/spotify'
+import { handleRedirectCallback, loginWithSpotify, logout } from '@/services/auth'
 
-const colors = reactive({ primary: '', secondary: '', tertiary: '' })
+const isAuthenticated = ref(false)
 
-function colorDistance(a: Color, b: Color): number {
+onMounted(async () => {
+  const token = await handleRedirectCallback()
+  
+  if (token) {
+    isAuthenticated.value = true
+    syncSpotify()
+    pollInterval = setInterval(syncSpotify, 3000)
+  }
+})
+
+const currentTrack = reactive({
+  title: 'Aguardando Spotify...',
+  artist: '',
+  album: '',
+  year: '',
+  coverUrl: '/mirage.webp',
+  durationMs: 0,
+  progressMs: 0,
+  isPlaying: false
+})
+
+const colors = reactive({ primary: '#111', secondary: '#333', tertiary: '#222' })
+const isImageLoaded = ref(false)
+let pollInterval: ReturnType<typeof setInterval> | null = null
+
+function colorDistance(a: Color, b: Color) {
   const { r: r1, g: g1, b: b1 } = a.rgb()
   const { r: r2, g: g2, b: b2 } = b.rgb()
   return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2)
 }
 
-function pickDistinctColors(palette: Color[], count = 3): Color[] {
+function pickDistinctColors(palette: Color[], count = 3) {
   const picked: Color[] = [palette[0]!]
   while (picked.length < count) {
     const best = palette
@@ -26,29 +53,128 @@ function pickDistinctColors(palette: Color[], count = 3): Color[] {
   return picked
 }
 
-const imagem = new Image()
-imagem.src = '/mirage.webp'
-imagem.onload = () => {
-  const raw = getPaletteSync(imagem, { colorCount: 8 })
-  if (!raw) return
-  const [c1, c2, c3] = pickDistinctColors(raw)
-  colors.primary   = c1?.hex() ?? ''
-  colors.secondary = c2?.hex() ?? ''
-  colors.tertiary  = c3?.hex() ?? ''
+watch(() => currentTrack.coverUrl, (newUrl) => {
+  if (!newUrl) return
+  isImageLoaded.value = false
+  
+  const img = new Image()
+  img.crossOrigin = 'Anonymous' // Must have for not being blocked by CORS
+  img.src = newUrl
+  
+  img.onload = () => {
+    const raw = getPaletteSync(img, { colorCount: 8 })
+    if (raw) {
+      const [c1, c2, c3] = pickDistinctColors(raw)
+      colors.primary   = c1?.hex() ?? colors.primary
+      colors.secondary = c2?.hex() ?? colors.secondary
+      colors.tertiary  = c3?.hex() ?? colors.tertiary
+    }
+    isImageLoaded.value = true
+  }
+}, { immediate: true })
+
+async function syncSpotify() {
+  try {
+    const state = await getPlaybackState()
+    if (!state || !state.item) return
+
+    currentTrack.title = state.item.name
+    currentTrack.artist = state.item.artists.map((a: any) => a.name).join(', ')
+    currentTrack.album = state.item.album.name
+    currentTrack.year = state.item.album.release_date.substring(0, 4)
+    
+    const newCover = state.item.album.images[0]?.url
+    if (currentTrack.coverUrl !== newCover) {
+      currentTrack.coverUrl = newCover
+    }
+
+    currentTrack.durationMs = state.item.duration_ms
+    currentTrack.progressMs = state.progress_ms
+    currentTrack.isPlaying = state.is_playing
+  } catch (e) {
+    console.error("Erro ao ler Spotify. O Token expirou?", e)
+  }
+}
+
+onMounted(() => {
+  syncSpotify()
+  pollInterval = setInterval(syncSpotify, 3000)
+})
+
+onUnmounted(() => {
+  if (pollInterval) clearInterval(pollInterval)
+})
+
+async function handlePlay() {
+  currentTrack.isPlaying = true
+  await play()
+  setTimeout(syncSpotify, 500) 
+}
+
+async function handlePause() {
+  currentTrack.isPlaying = false
+  await pause()
+  setTimeout(syncSpotify, 500)
+}
+
+async function handleSeek(percent: number) {
+  const targetMs = (percent / 100) * currentTrack.durationMs
+  currentTrack.progressMs = targetMs
+  await seek(targetMs)
+  setTimeout(syncSpotify, 500)
 }
 </script>
 
 <template>
-  <main
-    class="relative flex h-screen w-screen items-center justify-center overflow-hidden"
+ <main
+    class="relative flex h-screen w-screen items-center justify-center overflow-hidden transition-colors duration-1000"
     :style="{ '--c1': colors.primary, '--c2': colors.secondary, '--c3': colors.tertiary, backgroundColor: colors.primary }"
   >
     <div class="blob blob-1" />
     <div class="blob blob-2" />
     <div class="blob blob-3" />
 
-    <img :src="imagem.src" class="relative z-10 w-[min(75vw,650px)] -mx-50">
-    <VinylPlayer :primary-color="colors.primary" :secondary-color="colors.secondary" />
+
+    <!--LOGIN PAGE-->
+    <div v-if="!isAuthenticated" class="relative z-20 flex flex-col items-center gap-6 bg-black/40 p-10 rounded-3xl backdrop-blur-md border border-white/10">
+      <h1 class="text-3xl font-bold text-white tracking-tight">Spin on Vinyl</h1>
+      <p class="text-white/70 text-center max-w-sm">Connect your Spotify account to view your songs on a vinyl.</p>
+      
+      <button 
+        @click="loginWithSpotify"
+        class="bg-[#1DB954] text-black font-bold px-8 py-4 rounded-full hover:scale-105 transition-transform flex items-center gap-2"
+      >
+        Connect to Spotify
+      </button>
+    </div>
+
+    <!--Player (shows if authenticated)-->
+    <template v-else>
+      <button @click="logout" class="absolute top-6 right-6 z-50 text-white/50 hover:text-white text-sm">
+        Log-out
+      </button>
+
+      <img 
+        :src="currentTrack.coverUrl" 
+        class="relative z-10 w-[min(75vw,650px)] -mx-50 transition-opacity duration-1000 shadow-2xl rounded"
+        :class="isImageLoaded ? 'opacity-100' : 'opacity-0'"
+      >
+      
+      <VinylPlayer 
+        :title="currentTrack.title"
+        :artist="currentTrack.artist"
+        :album="currentTrack.album"
+        :year="currentTrack.year"
+        :primary-color="colors.primary" 
+        :secondary-color="colors.secondary" 
+        :is-playing="currentTrack.isPlaying"
+        :progress-ms="currentTrack.progressMs"
+        :duration-ms="currentTrack.durationMs"
+        @play="handlePlay"
+        @pause="handlePause"
+        @seek="handleSeek"
+      />
+    </template>
   </main>
 </template>
 

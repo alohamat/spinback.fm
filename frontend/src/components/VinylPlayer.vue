@@ -1,32 +1,46 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 
 interface VinylPlayerProps {
   title?: string; artist?: string; album?: string; year?: string
   primaryColor?: string; secondaryColor?: string
+  isPlaying: boolean;
+  progressMs: number;
+  durationMs: number;
 }
-withDefaults(defineProps<VinylPlayerProps>(), {
-  title: 'Lady Fantasy', artist: 'Camel',
-  album: 'Mirage', year: '1974',
+const props = withDefaults(defineProps<VinylPlayerProps>(), {
+  title: '', artist: '', album: '', year: '',
   primaryColor: '#8e44ad', secondaryColor: '#e67e22',
+  isPlaying: false, progressMs: 0, durationMs: 0
 })
 
-const currentTime = ref('02:37')
-const duration    = ref('12:11')
+const emit = defineEmits<{
+  (e: 'play'): void
+  (e: 'pause'): void
+  (e: 'seek', percent: number): void
+}>()
 
-// ─── Calibração ─────────────────────────────────────────────────────────
+function formatTime(ms: number) {
+  if (!ms) return '00:00'
+  const totalSeconds = Math.floor(ms / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+}
+
+const displayCurrentTime = computed(() => formatTime(props.progressMs))
+const displayDuration = computed(() => formatTime(props.durationMs))
+
 const TIP_X   = 0.15
 const TIP_Y   = 0.98
 const PIVOT_X = 0.72
 const PIVOT_Y = 0.15
-const DISC_R  = 0.705   // borda do vinil
-const LABEL_R = 0.17   // borda do label central (área não tocável)
+const DISC_R  = 0.705 
+const LABEL_R = 0.17 
 const DEBUG   = false
 
-const DRIFT_SPEED = 5
 const CENTER_X = 0.6 
 const CENTER_Y = 0.50
-// ────────────────────────────────────────────────────────────────────────
 
 const containerRef = ref<HTMLDivElement | null>(null)
 const needleRef    = ref<HTMLImageElement | null>(null)
@@ -34,7 +48,6 @@ const isDragging   = ref(false)
 const isReady      = ref(false)
 const isTouching   = ref(false)
 
-// ─── Rotação via rAF — pausar não reseta o ângulo ───────────────────────
 const vinylAngle = ref(0)
 let rAF: number | null = null
 let lastTime: DOMHighResTimeStamp | null = null
@@ -42,24 +55,22 @@ let lastTime: DOMHighResTimeStamp | null = null
 function tick(t: DOMHighResTimeStamp) {
   if (lastTime !== null) {
     const dt = t - lastTime
-    // 1. Gira o vinil
-    vinylAngle.value = (vinylAngle.value + (360 / 3000) * dt) % 360
-
-    // 2. Se a agulha está solta e tocando no disco, move ela para o centro
-    if (isTouching.value && !isDragging.value) {
-      angle.value += (DRIFT_SPEED / 1000) * dt
-      checkCollision() // Verifica se a agulha chegou no selo central (fim do disco)
+    
+    if (props.isPlaying && !isDragging.value) {
+      vinylAngle.value = (vinylAngle.value + (360 / 3000) * dt) % 360
+      
+      if (props.durationMs > 0 && isTouching.value) {
+         const swingTotalAngle = 25 
+         const progressPercentDelta = dt / props.durationMs
+         angle.value += swingTotalAngle * progressPercentDelta
+      }
+      
+      checkCollision()
     }
   }
 
-  // Só continua o loop se ainda estiver tocando
-  if (isTouching.value) {
-    lastTime = t
-    rAF = requestAnimationFrame(tick)
-  } else {
-    rAF = null
-    lastTime = null
-  }
+  lastTime = t
+  rAF = requestAnimationFrame(tick)
 }
 
 function startSpinning() {
@@ -74,13 +85,10 @@ function stopSpinning() {
   lastTime = null
 }
 
-// ─── Progresso: distância da ponta ao centro ────────────────────────────
 const trackProgress = ref(0)
 
 function updateProgress() {
   if (!containerRef.value) return
-
-  // Se a agulha não estiver tocando, a barra volta para 0%
   if (!isTouching.value) {
     trackProgress.value = 0
     return
@@ -101,7 +109,6 @@ function updateProgress() {
   trackProgress.value = Math.min(100, Math.max(0, p * 100))
 }
 
-// ─── Agulha ─────────────────────────────────────────────────────────────
 const needleSize = ref({ w: 0, h: 0 })
 const pivotPos   = ref({ x: 0, y: 0 })
 const angle      = ref(0)
@@ -126,13 +133,26 @@ function calcTip() {
   }
 }
 
+watch(() => props.progressMs, (newMs) => {
+  if (isDragging.value || props.durationMs <= 0 || !containerRef.value || !isReady.value || !isTouching.value) return;
+
+  const currentLocalMs = (trackProgress.value / 100) * props.durationMs;
+
+  if (Math.abs(newMs - currentLocalMs) > 1500) {
+    const diffMs = newMs - currentLocalMs;
+    const diffPercent = diffMs / props.durationMs;
+    
+    angle.value += 25 * diffPercent;
+    checkCollision();
+  }
+});
+
 function checkCollision() {
   if (!containerRef.value) return
   const tip  = calcTip()
   const w    = containerRef.value.offsetWidth
   const h    = containerRef.value.offsetHeight
   
-  // Usa a nova calibração
   const centerX = w * CENTER_X
   const centerY = h * CENTER_Y
   const dist = Math.hypot(tip.x - centerX, tip.y - centerY)
@@ -145,29 +165,14 @@ function checkCollision() {
   if (now && !isTouching.value) {
     isTouching.value = true
     startSpinning()
-    console.log('🎵 Agulha encostou no disco!')
   } else if (!now && isTouching.value) {
     isTouching.value = false
     stopSpinning()
-    console.log('🔇 Saiu do disco (ou chegou no fim!)')
   }
 
   updateProgress()
 }
 
-// Debug
-const debugTip   = computed(() => DEBUG ? calcTip() : null)
-const debugPivot = computed(() => DEBUG ? { ...pivotPos.value } : null)
-
-const debugCenter = computed(() => {
-  if (!DEBUG || !containerRef.value) return null
-  return {
-    x: containerRef.value.offsetWidth * CENTER_X,
-    y: containerRef.value.offsetHeight * CENTER_Y
-  }
-})
-
-// ─── Drag ────────────────────────────────────────────────────────────────
 function onMouseDown(e: MouseEvent) { isDragging.value = true; e.preventDefault() }
 
 function onMouseMove(e: MouseEvent) {
@@ -180,7 +185,15 @@ function onMouseMove(e: MouseEvent) {
   checkCollision()
 }
 
-function onMouseUp() { isDragging.value = false }
+function onMouseUp() { 
+  isDragging.value = false 
+  if (isTouching.value) {
+    emit('seek', trackProgress.value) 
+    emit('play')
+  } else {
+    emit('pause')
+  }
+}
 
 function initNeedle() {
   if (!needleRef.value || !containerRef.value) return
@@ -217,10 +230,8 @@ onUnmounted(() => {
 <template>
   <div class="flex flex-col items-center gap-4">
 
-    <!-- Container ESTÁTICO -->
     <div ref="containerRef" class="relative w-[min(75vw,650px)] aspect-square">
 
-      <!-- Vinil girado por rAF -->
       <div class="absolute inset-0" :style="{ transform: `rotate(${vinylAngle}deg)` }">
         <img src="/vinyl.webp" alt="Vinyl" class="w-full h-full object-contain" />
 
@@ -233,20 +244,10 @@ onUnmounted(() => {
           <h2 class="mt-1 text-[10px] sm:text-sm opacity-90">{{ artist }}</h2>
           <p class="text-[8px] sm:text-[10px] opacity-60">{{ album }} · {{ year }}</p>
           <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-neutral-900 shadow-[inset_0_1px_3px_rgba(255,255,255,0.25)]" />
-          <!-- Tempos dentro do label giram com o disco — omita se incomodar -->
-          <div class="absolute bottom-[13%] left-[15%] right-[15%] flex justify-between text-[7px] sm:text-[9px] opacity-70">
-            <span>{{ currentTime }}</span><span>{{ duration }}</span>
-          </div>
-          <div class="absolute bottom-[9%] left-[15%] right-[15%] h-[2px] rounded-full bg-white/15">
-            <div
-              class="h-full rounded-full"
-              :style="{ width: `${trackProgress}%`, background: `linear-gradient(90deg, ${secondaryColor}, ${primaryColor})` }"
-            />
-          </div>
         </div>
       </div>
 
-      <!-- Agulha -->
+      <!-- needle -->
       <img
         ref="needleRef"
         src="/needle.png"
@@ -268,26 +269,15 @@ onUnmounted(() => {
 
       <!-- Debug -->
       <template v-if="DEBUG">
-        <div v-if="debugTip"
-          class="absolute w-3 h-3 rounded-full bg-red-500 z-20 pointer-events-none -translate-x-1/2 -translate-y-1/2"
-          :style="{ left: `${debugTip.x}px`, top: `${debugTip.y}px` }"
-        />
-        <div v-if="debugPivot"
-          class="absolute w-3 h-3 rounded-full bg-blue-500 z-20 pointer-events-none -translate-x-1/2 -translate-y-1/2"
-          :style="{ left: `${debugPivot.x}px`, top: `${debugPivot.y}px` }"
-        />
-        <div v-if="debugCenter"
-          class="absolute w-3 h-3 rounded-full bg-green-500 z-20 pointer-events-none -translate-x-1/2 -translate-y-1/2"
-          :style="{ left: `${debugCenter.x}px`, top: `${debugCenter.y}px` }"
-        />
+       
       </template>
     </div>
 
-    <!-- ─── Barra de progresso externa ─────────────────────────────────── -->
-    <div class="w-[min(75vw,650px)] flex flex-col gap-1.5 px-1">
+    <!-- Outside progress bar-->
+    <div class="w-[min(75vw,650px)] flex flex-col gap-1.5 mt-5 px-1">
       <div class="flex justify-between text-xs text-white/60">
-        <span>{{ currentTime }}</span>
-        <span>{{ duration }}</span>
+        <span>{{ displayCurrentTime }}</span>
+        <span>{{ displayDuration }}</span>
       </div>
       <div class="h-1.5 rounded-full bg-white/15 overflow-hidden">
         <div
@@ -303,5 +293,3 @@ onUnmounted(() => {
 
   </div>
 </template>
-
-<!-- CSS animation removida — rotação agora via rAF -->
