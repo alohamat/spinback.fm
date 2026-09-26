@@ -277,14 +277,25 @@ function initNeedle() {
   syncNeedleWithPlayback()
 }
 
+let resizeObserver: ResizeObserver | null = null
+
 onMounted(() => {
   window.addEventListener('mousemove', onMouseMove)
   window.addEventListener('mouseup', onMouseUp)
+  window.addEventListener('resize', initNeedle)
+  if (containerRef.value && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(() => {
+      initNeedle()
+    })
+    resizeObserver.observe(containerRef.value)
+  }
   nextTick(initNeedle)
 })
 onUnmounted(() => {
   window.removeEventListener('mousemove', onMouseMove)
   window.removeEventListener('mouseup', onMouseUp)
+  window.removeEventListener('resize', initNeedle)
+  if (resizeObserver) resizeObserver.disconnect()
   stopSpinning()
 })
 </script>
@@ -292,7 +303,7 @@ onUnmounted(() => {
 <template>
   <div class="flex flex-col items-center gap-4">
 
-    <div ref="containerRef" class="relative w-[min(75vw,650px)] aspect-square">
+    <div ref="containerRef" class="relative w-[var(--player-size,min(75vw,650px))] aspect-square shrink-0">
 
       <div class="absolute inset-0" :style="{ transform: `rotate(${vinylAngle}deg)` }">
         <img src="/vinyl.webp" alt="Vinyl" class="w-full h-full object-contain" />
@@ -315,7 +326,7 @@ onUnmounted(() => {
         src="/needle.png"
         alt="Needle"
         draggable="false"
-        class="size-75 absolute select-none z-10 transition-opacity duration-200"
+        class="w-[calc(var(--player-size,650px)*0.4615)] h-[calc(var(--player-size,650px)*0.4615)] absolute select-none z-10 transition-opacity duration-200"
         :class="isDragging ? 'cursor-grabbing' : 'cursor-grab'"
         :style="{
           left: `${needleLeft}px`,
@@ -336,7 +347,7 @@ onUnmounted(() => {
     </div>
 
  <!-- Outside progress bar -->
-    <div class="fixed bottom-10 left-1/2 -translate-x-1/2 w-[min(85vw,650px)] z-40 flex flex-col gap-1.5 px-4 pointer-events-auto">
+    <div class="fixed bottom-4 sm:bottom-10 left-1/2 -translate-x-1/2 w-[min(92vw,650px)] z-40 flex flex-col gap-1.5 px-3 sm:px-4 pointer-events-auto">
       <div class="flex justify-between text-xs text-white/60">
         <span>{{ displayCurrentTime }}</span>
         <span>{{ displayDuration }}</span>
@@ -351,12 +362,12 @@ onUnmounted(() => {
           }"
         />
       </div>
-      <div class="flex justify-center mt-3">
-        <div class="flex items-center justify-center gap-4 px-5 py-2 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl shadow-black/40 pointer-events-auto">
+      <div class="flex justify-center mt-2 sm:mt-3">
+        <div class="flex items-center justify-center gap-3 sm:gap-4 px-4 sm:px-5 py-1.5 sm:py-2 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl shadow-black/40 pointer-events-auto">
           <!-- Backward Button -->
           <button
             @click="emit('backward')"
-            class="group relative flex items-center justify-center w-10 h-10 rounded-full bg-white/10 hover:bg-white/25 border border-white/20 transition-all duration-300 hover:scale-110 active:scale-95 text-white/80 hover:text-white cursor-pointer"
+            class="group relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/10 hover:bg-white/25 border border-white/20 transition-all duration-300 hover:scale-110 active:scale-95 text-white/80 hover:text-white cursor-pointer"
             :style="{ boxShadow: `0 4px 15px ${primaryColor}33` }"
             title="Anterior"
             type="button"
@@ -369,7 +380,7 @@ onUnmounted(() => {
           <!-- Play / Pause Button -->
           <button
             @click="togglePlay"
-            class="group relative flex items-center justify-center w-12 h-12 rounded-full border border-white/40 shadow-xl transition-all duration-300 hover:scale-110 active:scale-95 text-white overflow-hidden cursor-pointer"
+            class="group relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-full border border-white/40 shadow-xl transition-all duration-300 hover:scale-110 active:scale-95 text-white overflow-hidden cursor-pointer"
             :style="{
               background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
               boxShadow: `0 6px 20px -2px ${secondaryColor}66`
@@ -378,10 +389,10 @@ onUnmounted(() => {
             type="button"
           >
             <span class="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <svg v-if="!isPlaying" class="w-6 h-6 fill-current translate-x-0.5 relative z-10" viewBox="0 0 24 24">
+            <svg v-if="!isPlaying" class="w-5 h-5 sm:w-6 sm:h-6 fill-current translate-x-0.5 relative z-10" viewBox="0 0 24 24">
               <path d="M8 5v14l11-7z" />
             </svg>
-            <svg v-else class="w-6 h-6 fill-current relative z-10" viewBox="0 0 24 24">
+            <svg v-else class="w-5 h-5 sm:w-6 sm:h-6 fill-current relative z-10" viewBox="0 0 24 24">
               <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
             </svg>
           </button>
@@ -389,7 +400,7 @@ onUnmounted(() => {
           <!-- Forward Button -->
           <button
             @click="emit('forward')"
-            class="group relative flex items-center justify-center w-10 h-10 rounded-full bg-white/10 hover:bg-white/25 border border-white/20 transition-all duration-300 hover:scale-110 active:scale-95 text-white/80 hover:text-white cursor-pointer"
+            class="group relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/10 hover:bg-white/25 border border-white/20 transition-all duration-300 hover:scale-110 active:scale-95 text-white/80 hover:text-white cursor-pointer"
             :style="{ boxShadow: `0 4px 15px ${primaryColor}33` }"
             title="Próxima"
             type="button"

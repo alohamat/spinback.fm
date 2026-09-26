@@ -133,8 +133,14 @@ async function handleBackward() {
 
 <template>
  <main
-    class="relative flex h-screen w-screen items-center justify-center overflow-hidden transition-colors duration-1000"
-    :style="{ '--c1': colors.primary, '--c2': colors.secondary, '--c3': colors.tertiary, backgroundColor: colors.primary }"
+    class="relative flex h-screen w-screen flex-col items-center overflow-hidden transition-colors duration-1000 pt-[max(1.5rem,13vh)]"
+    :style="{ 
+      '--c1': colors.primary, 
+      '--c2': colors.secondary, 
+      '--c3': colors.tertiary, 
+      '--player-size': 'min(650px, calc((100vw - 32px) / 1.6923), calc(100vh - 270px))',
+      backgroundColor: colors.primary 
+    }"
   >
     <div class="blob blob-1" />
     <div class="blob blob-2" />
@@ -142,13 +148,13 @@ async function handleBackward() {
 
 
     <!--LOGIN PAGE-->
-    <div v-if="!isAuthenticated" class="relative z-20 flex flex-col items-center gap-6 bg-black/40 p-10 rounded-3xl backdrop-blur-md border border-white/10">
+    <div v-if="!isAuthenticated" class="relative z-20 flex flex-col items-center gap-6 bg-black/40 p-10 rounded-3xl backdrop-blur-md border border-white/10 my-auto">
       <h1 class="text-3xl font-bold text-white tracking-tight">Spin on Vinyl</h1>
       <p class="text-white/70 text-center max-w-sm">Connect your Spotify account to view your songs on a vinyl.</p>
       
       <button 
         @click="loginWithSpotify"
-        class="bg-[#1DB954] text-black font-bold px-8 py-4 rounded-full hover:scale-105 transition-transform flex items-center gap-2"
+        class="bg-[#1DB954] text-black font-bold px-8 py-4 rounded-full hover:scale-105 transition-transform flex items-center gap-2 cursor-pointer"
       >
         Connect to Spotify
       </button>
@@ -156,15 +162,16 @@ async function handleBackward() {
 
     <!--Player (shows if authenticated)-->
     <template v-else>
-      <button @click="logout" class="absolute top-1 right-6 z-50 text-white/50 hover:text-white text-sm">
+      <button @click="logout" class="absolute top-3 right-6 z-50 text-white/50 hover:text-white text-sm cursor-pointer">
         Log-out
       </button>
 
-      <div class="flex absolute top-35 right-100">
+      <div class="relative z-20 flex items-center justify-center">
 
         <img 
         :src="currentTrack.coverUrl" 
-        class="relative z-10 w-[min(75vw,650px)] -mx-50 transition-opacity duration-1000 shadow-2xl rounded"
+        class="relative z-10 w-[var(--player-size)] h-[var(--player-size)] transition-opacity duration-1000 shadow-2xl rounded object-cover flex-shrink-0"
+        :style="{ marginRight: 'calc(var(--player-size) * -0.3077)' }"
         :class="isImageLoaded ? 'opacity-100' : 'opacity-0'"
         >
         
