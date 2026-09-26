@@ -19,6 +19,7 @@ const emit = defineEmits<{
   (e: 'update:modelValue', index: number): void
   (e: 'play', item: MediaItem): void
   (e: 'select', item: MediaItem): void
+  (e: 'open', item: MediaItem): void
 }>()
 
 // Active index (interpolated for smooth dragging)
@@ -111,17 +112,16 @@ function onPointerUp(e: PointerEvent) {
   startSpring()
 }
 
-// Click handling: center and play
+// Click handling: center and open
 function handleItemClick(index: number, item: MediaItem) {
   if (isDragging.value) return
-  const isCenter = Math.abs(currentIndex.value - index) < 0.2
 
   targetIndex.value = index
   emit('update:modelValue', index)
   startSpring()
 
-  // Always emit play when clicked as requested
-  emit('play', item)
+  // Emit open to show songs inside the album/playlist
+  emit('open', item)
 }
 
 function prev() {
@@ -312,7 +312,8 @@ function isItemPlaying(item: MediaItem): boolean {
               >
                 <!-- Large Play / Playing Button -->
                 <div 
-                  class="w-14 h-14 md:w-16 md:md:h-16 rounded-full bg-[#1DB954] hover:bg-[#1ed760] text-black shadow-2xl flex items-center justify-center transform transition-transform duration-300 hover:scale-110 active:scale-95"
+                  @click.stop="emit('play', item)"
+                  class="w-14 h-14 md:w-16 md:md:h-16 rounded-full bg-[#1DB954] hover:bg-[#1ed760] text-black shadow-2xl flex items-center justify-center transform transition-transform duration-300 hover:scale-110 active:scale-95 cursor-pointer"
                 >
                   <!-- Playing Equalizer Animation -->
                   <div v-if="isItemPlaying(item)" class="flex items-end gap-1 h-5">
@@ -376,13 +377,23 @@ function isItemPlaying(item: MediaItem): boolean {
       <!-- Action Buttons -->
       <div class="flex items-center gap-3 mt-4">
         <button 
+          @click="emit('open', activeItem)"
+          class="flex items-center gap-2 bg-[#1DB954] hover:bg-[#1ed760] text-black font-bold px-5 py-2.5 rounded-full shadow-lg shadow-green-500/20 hover:scale-105 active:scale-95 transition-all cursor-pointer text-sm"
+        >
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+          </svg>
+          <span>View Songs</span>
+        </button>
+
+        <button 
           @click="emit('play', activeItem)"
-          class="flex items-center gap-2 bg-[#1DB954] hover:bg-[#1ed760] text-black font-bold px-6 py-2.5 rounded-full shadow-lg shadow-green-500/20 hover:scale-105 active:scale-95 transition-all cursor-pointer text-sm"
+          class="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-medium px-4 py-2.5 rounded-full border border-white/15 backdrop-blur-md hover:scale-105 active:scale-95 transition-all cursor-pointer text-sm"
         >
           <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
             <path d="M8 5v14l11-7z" />
           </svg>
-          <span>{{ isItemPlaying(activeItem) ? 'Playing Now' : 'Play on Spotify' }}</span>
+          <span>{{ isItemPlaying(activeItem) ? 'Playing' : 'Play' }}</span>
         </button>
 
         <router-link 
@@ -390,7 +401,6 @@ function isItemPlaying(item: MediaItem): boolean {
           class="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-medium px-4 py-2.5 rounded-full border border-white/15 backdrop-blur-md hover:scale-105 active:scale-95 transition-all text-sm cursor-pointer"
         >
           <span>Turntable</span>
-          <span class="text-base">💽</span>
         </router-link>
       </div>
 

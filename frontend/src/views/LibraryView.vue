@@ -2,14 +2,19 @@
 import { ref, computed, onMounted, onUnmounted, reactive, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import PanoramicCarousel from '@/components/PanoramicCarousel.vue'
+import MediaDetailModal from '@/components/MediaDetailModal.vue'
 import { 
   getUserAlbums, 
   getUserPlaylists, 
+  getAlbumDetails,
+  getPlaylistDetails,
   playContext, 
   getPlaybackState,
   pause,
   play,
   type MediaItem, 
+  type MediaItemDetails,
+  type TrackItem,
   DEMO_ALBUMS, 
   DEMO_PLAYLISTS 
 } from '@/services/spotify'
@@ -31,6 +36,11 @@ const albums = ref<MediaItem[]>([])
 const playlists = ref<MediaItem[]>([])
 const searchQuery = ref('')
 const selectedIndex = ref(0)
+
+// Modal state for album/playlist song details
+const isDetailModalOpen = ref(false)
+const selectedItemDetails = ref<MediaItemDetails | null>(null)
+const isDetailsLoading = ref(false)
 
 // Active playback state
 const isPlaying = ref(false)
@@ -241,6 +251,79 @@ async function togglePlayback() {
 function handleReauthorize() {
   loginWithSpotify()
 }
+
+// Open album/playlist detail view with songs, duration, and track count
+async function handleOpenItem(item: MediaItem) {
+  isDetailModalOpen.value = true
+  isDetailsLoading.value = true
+  selectedItemDetails.value = null
+
+  try {
+    if (item.type === 'album') {
+      selectedItemDetails.value = await getAlbumDetails(item.id, item)
+    } else {
+      selectedItemDetails.value = await getPlaylistDetails(item.id, item)
+    }
+  } catch (e) {
+    console.error('Error fetching details:', e)
+  } finally {
+    isDetailsLoading.value = false
+  }
+}
+
+async function handlePlayAll(details: MediaItemDetails) {
+  if (!isAuthenticated.value) {
+    showToast('Connect Spotify to play this directly on your account.', 'info')
+    loginWithSpotify()
+    return
+  }
+
+  showToast(`Starting "${details.title}" on Spotify...`, 'info')
+  const res = await playContext(details.uri)
+  if (res.success) {
+    currentlyPlayingUri.value = details.uri
+    isPlaying.value = true
+    currentTrackTitle.value = details.title
+    currentTrackArtist.value = details.subtitle
+    currentTrackCover.value = details.coverUrl
+    showToast(`Now Playing: ${details.title}`, 'success', 'Turntable', '/')
+    setTimeout(syncCurrentPlayback, 800)
+  } else if (res.noActiveDevice) {
+    showToast('No active Spotify player found. Please launch Spotify on your device.', 'warning')
+  } else if (res.premiumRequired) {
+    showToast('Spotify Premium is required for external playback control.', 'warning')
+  } else {
+    showToast(res.error || 'Failed to start playback on Spotify.', 'error')
+  }
+}
+
+async function handlePlayTrack(track: TrackItem, index: number) {
+  if (!isAuthenticated.value) {
+    showToast('Connect Spotify to play this song.', 'info')
+    loginWithSpotify()
+    return
+  }
+
+  const contextUri = selectedItemDetails.value?.uri || track.uri
+  showToast(`Playing "${track.name}"...`, 'info')
+
+  const res = await playContext(contextUri, { position: index })
+  if (res.success) {
+    currentlyPlayingUri.value = track.uri
+    isPlaying.value = true
+    currentTrackTitle.value = track.name
+    currentTrackArtist.value = track.artists || selectedItemDetails.value?.subtitle || ''
+    currentTrackCover.value = selectedItemDetails.value?.coverUrl || currentTrackCover.value
+    showToast(`Now Playing: ${track.name}`, 'success', 'Turntable', '/')
+    setTimeout(syncCurrentPlayback, 800)
+  } else if (res.noActiveDevice) {
+    showToast('No active Spotify player found. Please launch Spotify on your device.', 'warning')
+  } else if (res.premiumRequired) {
+    showToast('Spotify Premium is required for external playback control.', 'warning')
+  } else {
+    showToast(res.error || 'Failed to start song on Spotify.', 'error')
+  }
+}
 </script>
 
 <template>
@@ -426,8 +509,22 @@ function handleReauthorize() {
         :is-playing="isPlaying"
         :currently-playing-uri="currentlyPlayingUri"
         @play="handlePlayItem"
+        @open="handleOpenItem"
       />
     </section>
+
+    <!-- Album / Playlist Tracklist Details Modal -->
+    <MediaDetailModal 
+      :show="isDetailModalOpen"
+      :details="selectedItemDetails"
+      :is-loading="isDetailsLoading"
+      :is-playing="isPlaying"
+      :currently-playing-uri="currentlyPlayingUri"
+      :current-track-title="currentTrackTitle"
+      @close="isDetailModalOpen = false"
+      @play-all="handlePlayAll"
+      @play-track="handlePlayTrack"
+    />
 
     <!-- Bottom Toast Feedback Notification -->
     <transition name="toast-slide">
@@ -462,7 +559,7 @@ function handleReauthorize() {
     <!-- Persistent Bottom Playing Dock (if something is playing) -->
     <div 
       v-if="currentTrackTitle"
-      class="absolute bottom-0 z-40 w-full bg-black/40 border-t border-white/10 backdrop-blur-xl px-6 md:px-12 py-3 flex items-center justify-between"
+      class="absolute bottom-0  z-40 w-full bg-black/40 border-t border-white/10 backdrop-blur-xl px-6 md:px-12 py-2 flex items-center justify-between"
     >
       <div class="flex items-center gap-3 min-w-0">
         <img :src="currentTrackCover" class="w-10 h-10 rounded shadow-md object-cover shrink-0" alt="" />
