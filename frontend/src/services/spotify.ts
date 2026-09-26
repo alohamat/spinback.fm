@@ -40,3 +40,17 @@ export async function seek(positionMs: number) {
     headers: getHeaders() 
   })
 }
+
+export async function nextTrack() {
+  await fetch('https://api.spotify.com/v1/me/player/next', { 
+    method: 'POST', 
+    headers: getHeaders() 
+  })
+}
+
+export async function previousTrack() {
+  await fetch('https://api.spotify.com/v1/me/player/previous', { 
+    method: 'POST', 
+    headers: getHeaders() 
+  })
+}

@@ -3,7 +3,7 @@ import VinylPlayer from '@/components/VinylPlayer.vue'
 import { getPaletteSync } from 'colorthief'
 import type { Color } from 'colorthief'
 import { ref, onMounted, onUnmounted, reactive, watch } from 'vue'
-import { getPlaybackState, play, pause, seek } from '@/services/spotify'
+import { getPlaybackState, play, pause, seek, nextTrack, previousTrack } from '@/services/spotify'
 import { handleRedirectCallback, loginWithSpotify, logout } from '@/services/auth'
 
 const isAuthenticated = ref(false)
@@ -119,6 +119,16 @@ async function handleSeek(percent: number) {
   await seek(targetMs)
   setTimeout(syncSpotify, 500)
 }
+
+async function handleForward() {
+  await nextTrack()
+  setTimeout(syncSpotify, 500)
+}
+
+async function handleBackward() {
+  await previousTrack()
+  setTimeout(syncSpotify, 500)
+}
 </script>
 
 <template>
@@ -146,17 +156,19 @@ async function handleSeek(percent: number) {
 
     <!--Player (shows if authenticated)-->
     <template v-else>
-      <button @click="logout" class="absolute top-6 right-6 z-50 text-white/50 hover:text-white text-sm">
+      <button @click="logout" class="absolute top-1 right-6 z-50 text-white/50 hover:text-white text-sm">
         Log-out
       </button>
 
-      <img 
+      <div class="flex absolute top-35 right-100">
+
+        <img 
         :src="currentTrack.coverUrl" 
         class="relative z-10 w-[min(75vw,650px)] -mx-50 transition-opacity duration-1000 shadow-2xl rounded"
         :class="isImageLoaded ? 'opacity-100' : 'opacity-0'"
-      >
-      
-      <VinylPlayer 
+        >
+        
+        <VinylPlayer 
         :title="currentTrack.title"
         :artist="currentTrack.artist"
         :album="currentTrack.album"
@@ -169,7 +181,10 @@ async function handleSeek(percent: number) {
         @play="handlePlay"
         @pause="handlePause"
         @seek="handleSeek"
-      />
+        @forward="handleForward"
+        @backward="handleBackward"
+        />
+      </div>
     </template>
   </main>
 </template>

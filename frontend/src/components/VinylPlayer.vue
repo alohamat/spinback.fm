@@ -18,7 +18,17 @@ const emit = defineEmits<{
   (e: 'play'): void
   (e: 'pause'): void
   (e: 'seek', percent: number): void
+  (e: 'forward'): void
+  (e: 'backward'): void
 }>()
+
+function togglePlay() {
+  if (props.isPlaying) {
+    emit('pause')
+  } else {
+    emit('play')
+  }
+}
 
 function formatTime(ms: number) {
   if (!ms) return '00:00'
@@ -325,8 +335,8 @@ onUnmounted(() => {
       </template>
     </div>
 
-    <!-- Outside progress bar-->
-    <div class="w-[min(75vw,650px)] flex flex-col gap-1.5 mt-5 px-1">
+ <!-- Outside progress bar -->
+    <div class="fixed bottom-10 left-1/2 -translate-x-1/2 w-[min(85vw,650px)] z-40 flex flex-col gap-1.5 px-4 pointer-events-auto">
       <div class="flex justify-between text-xs text-white/60">
         <span>{{ displayCurrentTime }}</span>
         <span>{{ displayDuration }}</span>
@@ -340,6 +350,55 @@ onUnmounted(() => {
             transition: isTouching ? 'none' : 'width 0.4s ease',
           }"
         />
+      </div>
+      <div class="flex justify-center mt-3">
+        <div class="flex items-center justify-center gap-4 px-5 py-2 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl shadow-black/40 pointer-events-auto">
+          <!-- Backward Button -->
+          <button
+            @click="emit('backward')"
+            class="group relative flex items-center justify-center w-10 h-10 rounded-full bg-white/10 hover:bg-white/25 border border-white/20 transition-all duration-300 hover:scale-110 active:scale-95 text-white/80 hover:text-white cursor-pointer"
+            :style="{ boxShadow: `0 4px 15px ${primaryColor}33` }"
+            title="Anterior"
+            type="button"
+          >
+            <svg class="w-4 h-4 fill-current transition-transform group-hover:-translate-x-0.5" viewBox="0 0 24 24">
+              <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+            </svg>
+          </button>
+
+          <!-- Play / Pause Button -->
+          <button
+            @click="togglePlay"
+            class="group relative flex items-center justify-center w-12 h-12 rounded-full border border-white/40 shadow-xl transition-all duration-300 hover:scale-110 active:scale-95 text-white overflow-hidden cursor-pointer"
+            :style="{
+              background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+              boxShadow: `0 6px 20px -2px ${secondaryColor}66`
+            }"
+            :title="isPlaying ? 'Pausar' : 'Tocar'"
+            type="button"
+          >
+            <span class="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <svg v-if="!isPlaying" class="w-6 h-6 fill-current translate-x-0.5 relative z-10" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+            <svg v-else class="w-6 h-6 fill-current relative z-10" viewBox="0 0 24 24">
+              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+            </svg>
+          </button>
+
+          <!-- Forward Button -->
+          <button
+            @click="emit('forward')"
+            class="group relative flex items-center justify-center w-10 h-10 rounded-full bg-white/10 hover:bg-white/25 border border-white/20 transition-all duration-300 hover:scale-110 active:scale-95 text-white/80 hover:text-white cursor-pointer"
+            :style="{ boxShadow: `0 4px 15px ${primaryColor}33` }"
+            title="Próxima"
+            type="button"
+          >
+            <svg class="w-4 h-4 fill-current transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24">
+              <path d="M16 6h2v12h-2zm-10.5 0l8.5 6-8.5 6z" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
 
