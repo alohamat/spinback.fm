@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import VinylPlayer from '@/components/VinylPlayer.vue'
-import { getPaletteSync } from 'colorthief'
-import type { Color } from 'colorthief'
 import { ref, onMounted, onUnmounted, reactive, watch } from 'vue'
 import { getPlaybackState, play, pause, seek, nextTrack, previousTrack } from '@/services/spotify'
 import { handleRedirectCallback, loginWithSpotify, logout } from '@/services/auth'
+import { extractPaletteFromCover } from '@/utils/colorPalette'
 
 const isAuthenticated = ref(false)
 
@@ -33,44 +32,15 @@ const colors = reactive({ primary: '#111', secondary: '#333', tertiary: '#222' }
 const isImageLoaded = ref(false)
 let pollInterval: ReturnType<typeof setInterval> | null = null
 
-function colorDistance(a: Color, b: Color) {
-  const { r: r1, g: g1, b: b1 } = a.rgb()
-  const { r: r2, g: g2, b: b2 } = b.rgb()
-  return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2)
-}
-
-function pickDistinctColors(palette: Color[], count = 3) {
-  const picked: Color[] = [palette[0]!]
-  while (picked.length < count) {
-    const best = palette
-      .filter(c => !picked.includes(c))
-      .reduce((a, b) =>
-        Math.min(...picked.map(p => colorDistance(p, b))) >
-        Math.min(...picked.map(p => colorDistance(p, a))) ? b : a
-      )
-    picked.push(best)
-  }
-  return picked
-}
-
 watch(() => currentTrack.coverUrl, (newUrl) => {
   if (!newUrl) return
   isImageLoaded.value = false
-  
-  const img = new Image()
-  img.crossOrigin = 'Anonymous' // Must have for not being blocked by CORS
-  img.src = newUrl
-  
-  img.onload = () => {
-    const raw = getPaletteSync(img, { colorCount: 8 })
-    if (raw) {
-      const [c1, c2, c3] = pickDistinctColors(raw)
-      colors.primary   = c1?.hex() ?? colors.primary
-      colors.secondary = c2?.hex() ?? colors.secondary
-      colors.tertiary  = c3?.hex() ?? colors.tertiary
-    }
+  extractPaletteFromCover(newUrl, (extracted) => {
+    colors.primary = extracted.primary
+    colors.secondary = extracted.secondary
+    colors.tertiary = extracted.tertiary
     isImageLoaded.value = true
-  }
+  })
 }, { immediate: true })
 
 async function syncSpotify() {
@@ -170,7 +140,7 @@ async function handleBackward() {
 
         <img 
         :src="currentTrack.coverUrl" 
-        class="relative z-10 w-[var(--player-size)] h-[var(--player-size)] transition-opacity duration-1000 shadow-2xl rounded object-cover flex-shrink-0"
+        class="relative z-10 w-(--player-size) h-(--player-size) transition-opacity duration-1000 shadow-2xl rounded object-cover shrink-0"
         :style="{ marginRight: 'calc(var(--player-size) * -0.3077)' }"
         :class="isImageLoaded ? 'opacity-100' : 'opacity-0'"
         >

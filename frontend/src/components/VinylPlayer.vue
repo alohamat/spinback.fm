@@ -1,5 +1,17 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { formatTime } from '@/utils/formatTime'
+import {
+  PIVOT_X,
+  PIVOT_Y,
+  SWING_RANGE,
+  calcNaturalTipAngle,
+  calcNeedleTip,
+  calcRestAngle,
+  getAngleForProgress,
+  calcTrackProgress,
+  isNeedleOnDisc
+} from '@/utils/vinylMath'
 
 interface VinylPlayerProps {
   title?: string; artist?: string; album?: string; year?: string
@@ -30,30 +42,8 @@ function togglePlay() {
   }
 }
 
-function formatTime(ms: number) {
-  if (!ms) return '00:00'
-  const totalSeconds = Math.floor(ms / 1000)
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-}
-
 const displayCurrentTime = computed(() => formatTime(props.progressMs))
 const displayDuration = computed(() => formatTime(props.durationMs))
-
-const TIP_X   = 0.15
-const TIP_Y   = 0.98
-const PIVOT_X = 0.72
-const PIVOT_Y = 0.15
-const DISC_R  = 0.705 
-const LABEL_R = 0.17 
-const DEBUG   = false
-
-const CENTER_X = 0.6 
-const CENTER_Y = 0.50
-
-const START_ANGLE = -53
-const SWING_RANGE = 36
 
 const containerRef = ref<HTMLDivElement | null>(null)
 const needleRef    = ref<HTMLImageElement | null>(null)
@@ -109,40 +99,20 @@ function updateProgress() {
   const tip = calcTip()
   const w = containerRef.value.offsetWidth
   const h = containerRef.value.offsetHeight
-  
-  const centerX = w * CENTER_X
-  const centerY = h * CENTER_Y
-  const dist = Math.hypot(tip.x - centerX, tip.y - centerY)
-  
-  const outerR = (w / 2) * DISC_R
-  const innerR = (w / 2) * LABEL_R
-  const p = (outerR - dist) / (outerR - innerR)
-  
-  trackProgress.value = Math.min(100, Math.max(0, p * 100))
+  trackProgress.value = calcTrackProgress(tip, w, h)
 }
 
 const needleSize = ref({ w: 0, h: 0 })
 const pivotPos   = ref({ x: 0, y: 0 })
 const angle      = ref(0)
 
-const naturalTipAngle = computed(() => {
-  const { w, h } = needleSize.value
-  if (!w || !h) return 0
-  return Math.atan2((TIP_Y - PIVOT_Y) * h, (TIP_X - PIVOT_X) * w) * (180 / Math.PI)
-})
+const naturalTipAngle = computed(() => calcNaturalTipAngle(needleSize.value.w, needleSize.value.h))
 
 const needleLeft = computed(() => pivotPos.value.x - PIVOT_X * needleSize.value.w)
 const needleTop  = computed(() => pivotPos.value.y - PIVOT_Y * needleSize.value.h)
 
 function calcTip() {
-  const { w, h } = needleSize.value
-  const θ   = angle.value * (Math.PI / 180)
-  const dx0 = (TIP_X - PIVOT_X) * w
-  const dy0 = (TIP_Y - PIVOT_Y) * h
-  return {
-    x: pivotPos.value.x + dx0 * Math.cos(θ) - dy0 * Math.sin(θ),
-    y: pivotPos.value.y + dx0 * Math.sin(θ) + dy0 * Math.cos(θ),
-  }
+  return calcNeedleTip(pivotPos.value, angle.value, needleSize.value)
 }
 
 function getRestAngle() {
@@ -153,19 +123,9 @@ function getRestAngle() {
   const nh = needleRef.value.clientHeight
   if (!nw || !nh) return 0
 
-  pivotPos.value = { x: cw * 0.8, y: ch * 0 }
-  const restX = cw * 1.25
-  const restY = ch * 0.85
-  return (
-    Math.atan2(restY - pivotPos.value.y, restX - pivotPos.value.x) * (180 / Math.PI) -
-    naturalTipAngle.value
-  )
-}
-
-function getAngleForProgress(progressMs: number, durationMs: number): number {
-  if (durationMs <= 0) return START_ANGLE
-  const percent = Math.min(1, Math.max(0, progressMs / durationMs))
-  return START_ANGLE + SWING_RANGE * percent
+  const { angle: restAngle, pivot } = calcRestAngle(cw, ch, nw, nh)
+  pivotPos.value = pivot
+  return restAngle
 }
 
 function syncNeedleWithPlayback() {
@@ -211,18 +171,11 @@ watch(() => props.progressMs, (newMs) => {
 
 function checkCollision() {
   if (!containerRef.value) return
-  const tip  = calcTip()
-  const w    = containerRef.value.offsetWidth
-  const h    = containerRef.value.offsetHeight
-  
-  const centerX = w * CENTER_X
-  const centerY = h * CENTER_Y
-  const dist = Math.hypot(tip.x - centerX, tip.y - centerY)
-  
-  const outerR = (w / 2) * DISC_R
-  const innerR = (w / 2) * LABEL_R
+  const tip = calcTip()
+  const w = containerRef.value.offsetWidth
+  const h = containerRef.value.offsetHeight
 
-  const now = dist <= outerR && dist > innerR
+  const now = isNeedleOnDisc(tip, w, h)
 
   if (now && !isTouching.value) {
     isTouching.value = true
@@ -303,7 +256,7 @@ onUnmounted(() => {
 <template>
   <div class="flex flex-col items-center gap-4">
 
-    <div ref="containerRef" class="relative w-[var(--player-size,min(75vw,650px))] aspect-square shrink-0">
+    <div ref="containerRef" class="relative w-(--player-size,min(75vw,650px)) aspect-square shrink-0">
 
       <div class="absolute inset-0" :style="{ transform: `rotate(${vinylAngle}deg)` }">
         <img src="/vinyl.webp" alt="Vinyl" class="w-full h-full object-contain" />
@@ -339,11 +292,6 @@ onUnmounted(() => {
         @mousedown="onMouseDown"
         @load="initNeedle"
       />
-
-      <!-- Debug -->
-      <template v-if="DEBUG">
-       
-      </template>
     </div>
 
  <!-- Outside progress bar -->
