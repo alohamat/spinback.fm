@@ -96,10 +96,6 @@ async function syncSpotify() {
   }
 }
 
-onMounted(() => {
-  syncSpotify()
-  pollInterval = setInterval(syncSpotify, 3000)
-})
 
 onUnmounted(() => {
   if (pollInterval) clearInterval(pollInterval)

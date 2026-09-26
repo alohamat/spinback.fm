@@ -42,6 +42,9 @@ const DEBUG   = false
 const CENTER_X = 0.6 
 const CENTER_Y = 0.50
 
+const START_ANGLE = -53
+const SWING_RANGE = 36
+
 const containerRef = ref<HTMLDivElement | null>(null)
 const needleRef    = ref<HTMLImageElement | null>(null)
 const isDragging   = ref(false)
@@ -60,9 +63,8 @@ function tick(t: DOMHighResTimeStamp) {
       vinylAngle.value = (vinylAngle.value + (360 / 3000) * dt) % 360
       
       if (props.durationMs > 0 && isTouching.value) {
-         const swingTotalAngle = 25 
          const progressPercentDelta = dt / props.durationMs
-         angle.value += swingTotalAngle * progressPercentDelta
+         angle.value += SWING_RANGE * progressPercentDelta
       }
       
       checkCollision()
@@ -133,19 +135,69 @@ function calcTip() {
   }
 }
 
-watch(() => props.progressMs, (newMs) => {
-  if (isDragging.value || props.durationMs <= 0 || !containerRef.value || !isReady.value || !isTouching.value) return;
+function getRestAngle() {
+  if (!needleRef.value || !containerRef.value) return 0
+  const cw = containerRef.value.offsetWidth
+  const ch = containerRef.value.offsetHeight
+  const nw = needleRef.value.clientWidth
+  const nh = needleRef.value.clientHeight
+  if (!nw || !nh) return 0
 
-  const currentLocalMs = (trackProgress.value / 100) * props.durationMs;
+  pivotPos.value = { x: cw * 0.8, y: ch * 0 }
+  const restX = cw * 1.25
+  const restY = ch * 0.85
+  return (
+    Math.atan2(restY - pivotPos.value.y, restX - pivotPos.value.x) * (180 / Math.PI) -
+    naturalTipAngle.value
+  )
+}
 
-  if (Math.abs(newMs - currentLocalMs) > 1500) {
-    const diffMs = newMs - currentLocalMs;
-    const diffPercent = diffMs / props.durationMs;
-    
-    angle.value += 25 * diffPercent;
-    checkCollision();
+function getAngleForProgress(progressMs: number, durationMs: number): number {
+  if (durationMs <= 0) return START_ANGLE
+  const percent = Math.min(1, Math.max(0, progressMs / durationMs))
+  return START_ANGLE + SWING_RANGE * percent
+}
+
+function syncNeedleWithPlayback() {
+  if (!isReady.value || isDragging.value) return
+
+  if (props.isPlaying) {
+    angle.value = getAngleForProgress(props.progressMs, props.durationMs)
+    checkCollision()
+  } else {
+    if (!isTouching.value) {
+      angle.value = getRestAngle()
+      checkCollision()
+    }
   }
-});
+}
+
+watch(() => props.isPlaying, (newIsPlaying) => {
+  if (isDragging.value || !isReady.value) return
+  if (newIsPlaying) {
+    syncNeedleWithPlayback()
+  } else {
+    angle.value = getRestAngle()
+    checkCollision()
+  }
+})
+
+watch(() => props.progressMs, (newMs) => {
+  if (isDragging.value || props.durationMs <= 0 || !containerRef.value || !isReady.value) return
+
+  if (!isTouching.value && props.isPlaying) {
+    syncNeedleWithPlayback()
+    return
+  }
+
+  if (isTouching.value) {
+    const currentLocalMs = (trackProgress.value / 100) * props.durationMs
+    if (Math.abs(newMs - currentLocalMs) > 1500) {
+      angle.value = getAngleForProgress(newMs, props.durationMs)
+      checkCollision()
+    }
+  }
+})
 
 function checkCollision() {
   if (!containerRef.value) return
@@ -186,11 +238,14 @@ function onMouseMove(e: MouseEvent) {
 }
 
 function onMouseUp() { 
+  if (!isDragging.value) return
   isDragging.value = false 
   if (isTouching.value) {
     emit('seek', trackProgress.value) 
     emit('play')
   } else {
+    angle.value = getRestAngle()
+    checkCollision()
     emit('pause')
   }
 }
@@ -206,13 +261,10 @@ function initNeedle() {
   needleSize.value = { w: nw, h: nh }
   pivotPos.value   = { x: cw * 0.8, y: ch * 0 }
 
-  const restX = cw * 1.25
-  const restY = ch * 0.85
-  angle.value =
-    Math.atan2(restY - pivotPos.value.y, restX - pivotPos.value.x) * (180 / Math.PI)
-    - naturalTipAngle.value
-
+  angle.value = getRestAngle()
   isReady.value = true
+
+  syncNeedleWithPlayback()
 }
 
 onMounted(() => {
