@@ -265,7 +265,7 @@ onUnmounted(() => {
           class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[34%] aspect-square rounded-full flex flex-col items-center justify-center text-white text-center shadow-[inset_0_0_30px_rgba(0,0,0,0.45)]"
           :style="{ background: `radial-gradient(circle at 30% 20%, ${secondaryColor}, transparent 60%), linear-gradient(135deg, ${primaryColor}, #111)` }"
         >
-          <span class="text-[8px] sm:text-[10px] tracking-[0.2em] uppercase opacity-70 mb-2">Tocando agora</span>
+          <span class="text-[8px] sm:text-[10px] tracking-[0.2em] uppercase opacity-70 mb-2">Playing now</span>
           <h1 class="text-sm sm:text-xl md:text-2xl font-medium leading-tight">{{ title }}</h1>
           <h2 class="mt-1 text-[10px] sm:text-sm opacity-90">{{ artist }}</h2>
           <p class="text-[8px] sm:text-[10px] opacity-60">{{ album }} · {{ year }}</p>

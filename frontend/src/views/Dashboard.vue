@@ -103,7 +103,7 @@ async function handleBackward() {
 
 <template>
  <main
-    class="relative flex h-screen w-screen flex-col items-center overflow-hidden transition-colors duration-1000 pt-[max(1.5rem,13vh)]"
+    class="relative flex h-screen w-screen flex-col items-center overflow-hidden transition-colors duration-1000 pt-20"
     :style="{ 
       '--c1': colors.primary, 
       '--c2': colors.secondary, 
@@ -116,25 +116,71 @@ async function handleBackward() {
     <div class="blob blob-2" />
     <div class="blob blob-3" />
 
+    <!-- Top Navigation Header -->
+    <header class="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-12 py-5 w-full">
+      <!-- Logo Branding -->
+      <router-link to="/" class="flex items-center gap-3 group cursor-pointer">
+        <div class="relative w-8 h-8 rounded-full bg-black/60 border border-white/20 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+          <div class="w-3.5 h-3.5 rounded-full bg-[#1DB954] shadow-[0_0_8px_#1DB954]" />
+        </div>
+        <span class="text-xl font-bold tracking-tight text-white group-hover:text-white/90 transition-colors">
+          spinback<span class="text-[#1DB954]">.fm</span>
+        </span>
+      </router-link>
+
+      <!-- Page Switcher Pill -->
+      <nav class="flex items-center p-1 rounded-full bg-black/40 border border-white/10 backdrop-blur-xl shadow-xl">
+        <router-link 
+          to="/"
+          class="flex items-center gap-2 px-5 py-2 rounded-full text-xs sm:text-sm font-semibold bg-white/15 text-white shadow-md border border-white/10 transition-all cursor-pointer"
+        >
+          <span>Turntable</span>
+        </router-link>
+
+        <router-link 
+          to="/library"
+          class="flex items-center gap-2 px-5 py-2 rounded-full text-xs sm:text-sm font-semibold text-white/60 hover:text-white transition-all cursor-pointer"
+        >
+          <span>Library</span>
+        </router-link>
+      </nav>
+
+      <!-- Auth Action -->
+      <div class="flex items-center gap-3">
+        <button 
+          v-if="isAuthenticated" 
+          @click="logout" 
+          class="text-xs sm:text-sm text-white/50 hover:text-white transition-colors cursor-pointer px-3 py-1.5 rounded-full hover:bg-white/5"
+        >
+          Log-out
+        </button>
+      </div>
+    </header>
 
     <!--LOGIN PAGE-->
     <div v-if="!isAuthenticated" class="relative z-20 flex flex-col items-center gap-6 bg-black/40 p-10 rounded-3xl backdrop-blur-md border border-white/10 my-auto">
       <h1 class="text-3xl font-bold text-white tracking-tight">Spin on Vinyl</h1>
       <p class="text-white/70 text-center max-w-sm">Connect your Spotify account to view your songs on a vinyl.</p>
       
-      <button 
-        @click="loginWithSpotify"
-        class="bg-[#1DB954] text-black font-bold px-8 py-4 rounded-full hover:scale-105 transition-transform flex items-center gap-2 cursor-pointer"
-      >
-        Connect to Spotify
-      </button>
+      <div class="flex flex-col sm:flex-row items-center gap-3">
+        <button 
+          @click="loginWithSpotify"
+          class="bg-[#1DB954] text-black font-bold px-8 py-4 rounded-full hover:scale-105 transition-transform flex items-center gap-2 cursor-pointer shadow-lg shadow-green-500/25"
+        >
+          Connect to Spotify
+        </button>
+
+        <router-link
+          to="/library"
+          class="bg-white/10 hover:bg-white/20 text-white font-semibold px-6 py-4 rounded-full transition-all border border-white/15 backdrop-blur-md cursor-pointer text-sm"
+        >
+          Explore Library 📚
+        </router-link>
+      </div>
     </div>
 
     <!--Player (shows if authenticated)-->
     <template v-else>
-      <button @click="logout" class="absolute top-3 right-6 z-50 text-white/50 hover:text-white text-sm cursor-pointer">
-        Log-out
-      </button>
 
       <div class="relative z-20 flex items-center justify-center">
 

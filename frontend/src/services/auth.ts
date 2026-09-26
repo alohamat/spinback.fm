@@ -1,6 +1,6 @@
 const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID
 const REDIRECT_URI = 'http://127.0.0.1:5173' 
-const SCOPES = 'user-read-playback-state user-modify-playback-state'
+const SCOPES = 'user-read-playback-state user-modify-playback-state user-library-read playlist-read-private playlist-read-collaborative'
 
 function generateRandomString(length: number) {
   const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -43,7 +43,8 @@ export async function handleRedirectCallback(): Promise<string | null> {
   const code = urlParams.get('code')
   
   if (!code) {
-    window.history.replaceState({}, document.title, '/')
+    const cleanUrl = window.location.pathname || '/'
+    window.history.replaceState({}, document.title, cleanUrl)
     return localStorage.getItem('spotify_token')
   }
 
@@ -67,7 +68,8 @@ export async function handleRedirectCallback(): Promise<string | null> {
     const data = await response.json()
     if (data.access_token) {
       localStorage.setItem('spotify_token', data.access_token)
-      window.history.replaceState({}, document.title, '/')
+      const cleanUrl = window.location.pathname || '/'
+      window.history.replaceState({}, document.title, cleanUrl)
       return data.access_token
     }
   } catch (e) {
