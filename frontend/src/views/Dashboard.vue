@@ -131,15 +131,22 @@ async function handleBackward() {
       <!-- Page Switcher Pill -->
       <nav class="flex items-center p-1 md:absolute md:left-1/2 md:-translate-x-1/2 rounded-full bg-black/40 border border-white/10 backdrop-blur-xl shadow-xl">
         <router-link 
+          to="/stats"
+          class="flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold text-white/60 hover:text-white transition-all cursor-pointer"
+        >
+          <span>Statistics</span>
+        </router-link>
+
+        <router-link 
           to="/"
-          class="flex items-center gap-2 px-5 py-2 rounded-full text-xs sm:text-sm font-semibold bg-white/15 text-white shadow-md border border-white/10 transition-all cursor-pointer"
+          class="flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold bg-white/15 text-white shadow-md border border-white/10 transition-all cursor-pointer"
         >
           <span>Turntable</span>
         </router-link>
 
         <router-link 
           to="/library"
-          class="flex items-center gap-2 px-5 py-2 rounded-full text-xs sm:text-sm font-semibold text-white/60 hover:text-white transition-all cursor-pointer"
+          class="flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold text-white/60 hover:text-white transition-all cursor-pointer"
         >
           <span>Library</span>
         </router-link>

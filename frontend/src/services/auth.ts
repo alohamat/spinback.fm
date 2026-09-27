@@ -1,6 +1,6 @@
 const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID
 const REDIRECT_URI = 'http://127.0.0.1:5173' 
-const SCOPES = 'user-read-playback-state user-modify-playback-state user-library-read playlist-read-private playlist-read-collaborative'
+const SCOPES = 'user-read-playback-state user-modify-playback-state user-library-read playlist-read-private playlist-read-collaborative user-top-read user-read-recently-played'
 
 function generateRandomString(length: number) {
   const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'

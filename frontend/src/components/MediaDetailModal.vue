@@ -133,7 +133,7 @@ function goToTurntable() {
           <!-- Content when Loaded -->
           <template v-else-if="details">
             <!-- MINIMALIST HERO HEADER -->
-            <div class="relative z-10 flex flex-col sm:flex-row items-center sm:items-start gap-5 p-6 sm:p-7 border-b border-white/[0.06] shrink-0">
+            <div class="relative z-10 flex flex-col sm:flex-row items-center sm:items-start gap-5 p-6 sm:p-7 border-b border-white/6 shrink-0">
               
               <!-- Clean Album Artwork -->
               <div class="relative w-32 h-32 sm:w-36 sm:h-36 shrink-0 group">
@@ -192,7 +192,7 @@ function goToTurntable() {
 
             <!-- MINIMALIST SONGS LIST -->
             <div class="relative z-10 flex-1 overflow-y-auto px-3 sm:px-6 py-3 custom-scrollbar">
-              <div class="divide-y divide-white/[0.04]">
+              <div class="divide-y divide-white/4">
                 <div 
                   v-for="(track, index) in details.tracks"
                   :key="track.id"

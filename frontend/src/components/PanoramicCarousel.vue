@@ -246,7 +246,7 @@ function isItemPlaying(item: MediaItem): boolean {
     <!-- Panoramic 3D Stage Container -->
     <div 
       ref="stageRef"
-      class="carousel-stage relative w-full h-[400px] md:h-[460px] flex items-center justify-center cursor-grab active:cursor-grabbing"
+      class="carousel-stage relative w-full h-100 md:h-115 flex items-center justify-center cursor-grab"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"

@@ -356,15 +356,22 @@ async function handlePlayTrack(track: TrackItem, index: number) {
       <!-- Page Switcher Pill -->
       <nav class="flex items-center p-1 md:absolute md:left-1/2 md:-translate-x-1/2 rounded-full bg-black/40 border border-white/10 backdrop-blur-xl shadow-xl">
         <router-link 
+          to="/stats"
+          class="flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold text-white/60 hover:text-white transition-all cursor-pointer"
+        >
+          <span>Statistics</span>
+        </router-link>
+
+        <router-link 
           to="/"
-          class="flex items-center gap-2 px-5 py-2 rounded-full text-xs sm:text-sm font-semibold text-white/60 hover:text-white transition-all cursor-pointer"
+          class="flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold text-white/60 hover:text-white transition-all cursor-pointer"
         >
           <span>Turntable</span>
         </router-link>
 
         <router-link 
           to="/library"
-          class="flex items-center gap-2 px-5 py-2 rounded-full text-xs sm:text-sm font-semibold bg-white/15 text-white shadow-md border border-white/10 transition-all cursor-pointer"
+          class="flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold bg-white/15 text-white shadow-md border border-white/10 transition-all cursor-pointer"
         >
           <span>Library</span>
         </router-link>
@@ -461,7 +468,7 @@ async function handlePlayTrack(track: TrackItem, index: number) {
           v-model="searchQuery"
           type="text"
           :placeholder="activeTab === 'albums' ? 'Search albums or artists...' : 'Search playlists...'"
-          class="w-full bg-black/40 border border-white/15 focus:border-[#1DB954] text-white text-xs md:text-sm rounded-full py-2.5 pl-10 pr-9 backdrop-blur-xl outline-none placeholder-white/40 transition-all shadow-inner"
+          class="w-full bg-black/40 border border-white/15 text-white text-xs md:text-sm rounded-full py-2.5 pl-10 pr-9 backdrop-blur-xl outline-none transition-all shadow-inner"
         />
         <svg class="w-4 h-4 text-white/40 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
