@@ -117,7 +117,7 @@ async function handleBackward() {
     <div class="blob blob-3" />
 
     <!-- Top Navigation Header -->
-    <header class="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-12 py-5 w-full">
+    <header class="absolute top-0 z-50 flex md:flex-row flex-col gap-1 items-center justify-between md:px-12 py-5 w-full">
       <!-- Logo Branding -->
       <router-link to="/" class="flex items-center gap-3 group cursor-pointer">
         <div class="relative w-8 h-8 rounded-full bg-black/60 border border-white/20 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
@@ -129,7 +129,7 @@ async function handleBackward() {
       </router-link>
 
       <!-- Page Switcher Pill -->
-      <nav class="flex items-center p-1 rounded-full bg-black/40 border border-white/10 backdrop-blur-xl shadow-xl">
+      <nav class="flex items-center p-1 md:absolute md:left-1/2 md:-translate-x-1/2 rounded-full bg-black/40 border border-white/10 backdrop-blur-xl shadow-xl">
         <router-link 
           to="/"
           class="flex items-center gap-2 px-5 py-2 rounded-full text-xs sm:text-sm font-semibold bg-white/15 text-white shadow-md border border-white/10 transition-all cursor-pointer"
@@ -174,7 +174,7 @@ async function handleBackward() {
           to="/library"
           class="bg-white/10 hover:bg-white/20 text-white font-semibold px-6 py-4 rounded-full transition-all border border-white/15 backdrop-blur-md cursor-pointer text-sm"
         >
-          Explore Library 📚
+          Demo Library 📚
         </router-link>
       </div>
     </div>

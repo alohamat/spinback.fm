@@ -525,7 +525,7 @@ export const DEMO_ALBUMS: MediaItem[] = [
     title: 'Random Access Memories',
     subtitle: 'Daft Punk',
     year: '2013',
-    coverUrl: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=600&auto=format&fit=crop&q=80',
+    coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/e8/43/5f/e8435ffa-b6b9-b171-40ab-4ff3959ab661/886443919266.jpg/600x600bb.jpg',
     uri: 'spotify:album:4m2880jivSbbyEGAKfITCa',
     type: 'album',
     tracksCount: 13
@@ -535,7 +535,7 @@ export const DEMO_ALBUMS: MediaItem[] = [
     title: 'The Dark Side of the Moon',
     subtitle: 'Pink Floyd',
     year: '1973',
-    coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80',
+    coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/49/86/18/49861852-877b-0992-fa27-58b25fa032b5/196589805232.jpg/600x600bb.jpg',
     uri: 'spotify:album:4LH4d3cOWNNXdsqFd4G7gv',
     type: 'album',
     tracksCount: 10
@@ -545,7 +545,7 @@ export const DEMO_ALBUMS: MediaItem[] = [
     title: 'Currents',
     subtitle: 'Tame Impala',
     year: '2015',
-    coverUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&auto=format&fit=crop&q=80',
+    coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/a8/2e/b4/a82eb490-f30a-a321-461a-0383c88fec95/15UMGIM23316.rgb.jpg/600x600bb.jpg',
     uri: 'spotify:album:79dL7FLiJFOO0EoehUHQBv',
     type: 'album',
     tracksCount: 13
@@ -555,7 +555,7 @@ export const DEMO_ALBUMS: MediaItem[] = [
     title: 'Rumours',
     subtitle: 'Fleetwood Mac',
     year: '1977',
-    coverUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80',
+    coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/4d/13/ba/4d13bac3-d3d5-7581-2c74-034219eadf2b/081227970949.jpg/600x600bb.jpg',
     uri: 'spotify:album:1bt6q2S3hk52zNVq0MYYoq',
     type: 'album',
     tracksCount: 11
@@ -565,31 +565,11 @@ export const DEMO_ALBUMS: MediaItem[] = [
     title: 'Abbey Road',
     subtitle: 'The Beatles',
     year: '1969',
-    coverUrl: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=600&auto=format&fit=crop&q=80',
+    coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/48/53/43/485343e3-dd6a-0034-faec-f4b6403f8108/13UMGIM63890.rgb.jpg/600x600bb.jpg',
     uri: 'spotify:album:0ETFjA39vXvRwEhG97Y6TN',
     type: 'album',
     tracksCount: 17
   },
-  {
-    id: 'demo-6',
-    title: 'Kind of Blue',
-    subtitle: 'Miles Davis',
-    year: '1959',
-    coverUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80',
-    uri: 'spotify:album:1weenldGlxKi6kEN9IR9UF',
-    type: 'album',
-    tracksCount: 5
-  },
-  {
-    id: 'demo-7',
-    title: 'DAMN.',
-    subtitle: 'Kendrick Lamar',
-    year: '2017',
-    coverUrl: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=600&auto=format&fit=crop&q=80',
-    uri: 'spotify:album:4eLPsYPBmXABThSJ821sqY',
-    type: 'album',
-    tracksCount: 14
-  }
 ]
 
 export const DEMO_PLAYLISTS: MediaItem[] = [
@@ -726,24 +706,4 @@ export const DEMO_TRACKS_MAP: Record<string, TrackItem[]> = {
     { id: 'dpl1-9', name: 'Breathe', trackNumber: 9, durationMs: 279000, uri: 'spotify:track:7wD3Z32a4l9pI1j9vKq1bC', artists: 'Télépopmusik' },
     { id: 'dpl1-10', name: 'Teardrop', trackNumber: 10, durationMs: 330000, uri: 'spotify:track:67Hna13dNDkZvBpTXRIaOJ', artists: 'Massive Attack' }
   ],
-  'demo-pl-2': [
-    { id: 'dpl2-1', name: 'Gymnopédie No. 1', trackNumber: 1, durationMs: 204000, uri: 'spotify:track:5NGtFXVpXSvwunEIGeviY3', artists: 'Erik Satie' },
-    { id: 'dpl2-2', name: 'Clair de Lune', trackNumber: 2, durationMs: 302000, uri: 'spotify:track:6N7nAnJWmnggpvlTl9IZio', artists: 'Claude Debussy' },
-    { id: 'dpl2-3', name: 'Avril 14th', trackNumber: 3, durationMs: 125000, uri: 'spotify:track:2MZSXhq4XDJWuCi0Tne2le', artists: 'Aphex Twin' },
-    { id: 'dpl2-4', name: 'Nuvole Bianche', trackNumber: 4, durationMs: 357000, uri: 'spotify:track:3weNRklVDql4KaHZgd3TC9', artists: 'Ludovico Einaudi' },
-    { id: 'dpl2-5', name: 'Spiegel im Spiegel', trackNumber: 5, durationMs: 541000, uri: 'spotify:track:4w3Wa814Uu4zN513p2nKjQ', artists: 'Arvo Pärt' },
-    { id: 'dpl2-6', name: 'Weightless', trackNumber: 6, durationMs: 485000, uri: 'spotify:track:6kkwzB6hXLIONkEkRYJci9', artists: 'Marconi Union' },
-    { id: 'dpl2-7', name: 'Day One', trackNumber: 7, durationMs: 200000, uri: 'spotify:track:4vpejhAWhZ78Kq9X1K80t3', artists: 'Hans Zimmer' },
-    { id: 'dpl2-8', name: 'Written on the Sky', trackNumber: 8, durationMs: 99000, uri: 'spotify:track:1vB7x6k7l8m9n0p1q2r3s5', artists: 'Max Richter' }
-  ],
-  'demo-pl-3': [
-    { id: 'dpl3-1', name: 'Plastic Love', trackNumber: 1, durationMs: 292000, uri: 'spotify:track:7rU6IebxzVgn8S52xRva9z', artists: 'Mariya Takeuchi' },
-    { id: 'dpl3-2', name: 'Stay with Me', trackNumber: 2, durationMs: 301000, uri: 'spotify:track:2BHj31ufdEqVK5CkSYkr9A', artists: 'Miki Matsubara' },
-    { id: 'dpl3-3', name: '4:00 A.M.', trackNumber: 3, durationMs: 254000, uri: 'spotify:track:1VlhY3vYj21vLhP1g6l4n7', artists: 'Taeko Onuki' },
-    { id: 'dpl3-4', name: 'Flyday Chinatown', trackNumber: 4, durationMs: 206000, uri: 'spotify:track:27iU8ZlV4uWpWd1Rz2Ua8P', artists: 'Yasuha' },
-    { id: 'dpl3-5', name: 'Ride on Time', trackNumber: 5, durationMs: 345000, uri: 'spotify:track:6n9dI63XQZ2L3bF6z0Q4wX', artists: 'Tatsuro Yamashita' },
-    { id: 'dpl3-6', name: 'Telephone Number', trackNumber: 6, durationMs: 236000, uri: 'spotify:track:4Z9K0K1bF4q7wL1n0v8a0b', artists: 'Junko Ohashi' },
-    { id: 'dpl3-7', name: 'Dress Down', trackNumber: 7, durationMs: 242000, uri: 'spotify:track:0XmH9Y5aZ1k0L3m4p7w1a0', artists: 'Kaoru Akimoto' },
-    { id: 'dpl3-8', name: 'Bay City', trackNumber: 8, durationMs: 250000, uri: 'spotify:track:2N3K4v5w6x7y8z9a0b1c2d', artists: 'Junko Yagami' }
-  ]
 }

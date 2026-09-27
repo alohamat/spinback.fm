@@ -342,10 +342,10 @@ async function handlePlayTrack(track: TrackItem, index: number) {
     <div class="blob blob-3" />
 
     <!-- Top Navigation Header -->
-    <header class="relative z-50 flex items-center justify-between px-6 md:px-12 py-5 w-full">
+    <header class="relative z-50 flex md:flex-row flex-col gap-1 items-center justify-between md:px-12 py-5 w-full">
       <!-- Logo Branding -->
       <router-link to="/" class="flex items-center gap-3 group cursor-pointer">
-        <div class="relative w-8 h-8 rounded-full bg-black/60 border border-white/20 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+        <div class="relative w-fit px-2 h-8 rounded-full bg-black/60 border border-white/20 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
           <div class="w-3.5 h-3.5 rounded-full bg-[#1DB954] shadow-[0_0_8px_#1DB954]" />
         </div>
         <span class="text-xl font-bold tracking-tight text-white group-hover:text-white/90 transition-colors">
@@ -354,7 +354,7 @@ async function handlePlayTrack(track: TrackItem, index: number) {
       </router-link>
 
       <!-- Page Switcher Pill -->
-      <nav class="flex items-center p-1 rounded-full bg-black/40 border border-white/10 backdrop-blur-xl shadow-xl">
+      <nav class="flex items-center p-1 md:absolute md:left-1/2 md:-translate-x-1/2 rounded-full bg-black/40 border border-white/10 backdrop-blur-xl shadow-xl">
         <router-link 
           to="/"
           class="flex items-center gap-2 px-5 py-2 rounded-full text-xs sm:text-sm font-semibold text-white/60 hover:text-white transition-all cursor-pointer"
