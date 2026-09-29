@@ -49,7 +49,6 @@ export interface TopTrackItem {
   popularity: number
   previewUrl?: string | null
   explicit?: boolean
-  playCount: number
 }
 
 export interface TopArtistItem {
@@ -61,7 +60,6 @@ export interface TopArtistItem {
   popularity: number
   followers?: number
   uri: string
-  playCount: number
 }
 
 export interface TopAlbumItem {
@@ -72,8 +70,8 @@ export interface TopAlbumItem {
   uri: string
   year?: string
   totalTracks?: number
-  tracksCountInTop?: number
-  playCount: number
+  tracksCountInTop: number
+  popularity: number
 }
 
 export interface RecentlyPlayedItem {
@@ -97,9 +95,8 @@ export interface PlayResult {
 }
 
 function getHeaders() {
-  const token = getAccessToken()
   return {
-    Authorization: `Bearer ${token}`,
+    Authorization: `Bearer ${getAccessToken()}`,
     'Content-Type': 'application/json'
   }
 }
@@ -286,7 +283,7 @@ function getDemoTracks(title: string, artist: string, count = 10): TrackItem[] {
     id: `demo-track-${i + 1}`,
     name: `${title} - Part ${i + 1}`,
     trackNumber: i + 1,
-    durationMs: 210000 + (i * 13000) % 90000,
+    durationMs: 210000,
     uri: `spotify:track:demo${i + 1}`,
     artists: artist
   }))
@@ -397,26 +394,6 @@ export async function getPlaylistDetails(playlistId: string, fallbackItem?: Medi
   }
 }
 
-// Play count derivations for time ranges
-function calculateTrackPlays(index: number, timeRange: TimeRange, popularity = 50): number {
-  const popBonus = Math.round(popularity / 10)
-  if (timeRange === 'short_term') {
-    return Math.max(5, Math.round(52 * Math.pow(0.86, index)) + popBonus)
-  }
-  if (timeRange === 'medium_term') {
-    return Math.max(18, Math.round(185 * Math.pow(0.88, index)) + popBonus * 3)
-  }
-  return Math.max(45, Math.round(420 * Math.pow(0.89, index)) + popBonus * 6)
-}
-
-function calculateArtistPlays(index: number, timeRange: TimeRange, trackPlaysSum: number): number {
-  let basePlays = 0
-  if (timeRange === 'short_term') basePlays = Math.max(15, Math.round(85 * Math.pow(0.84, index)))
-  else if (timeRange === 'medium_term') basePlays = Math.max(40, Math.round(290 * Math.pow(0.85, index)))
-  else basePlays = Math.max(95, Math.round(650 * Math.pow(0.86, index)))
-  return Math.max(basePlays, trackPlaysSum)
-}
-
 export async function getTopTracks(
   timeRange: TimeRange = 'short_term',
   limit = 10
@@ -438,7 +415,7 @@ export async function getTopTracks(
     if (!okStatus(res.status)) return { items: [], error: `Failed to load top tracks (${res.status})` }
 
     const data = await res.json()
-    const items: TopTrackItem[] = (data.items || []).slice(0, limit).map((t: any, index: number) => ({
+    const items: TopTrackItem[] = (data.items || []).slice(0, limit).map((t: any) => ({
       id: t.id,
       name: t.name,
       artists: t.artists?.map((a: any) => a.name).join(', ') || 'Unknown Artist',
@@ -449,8 +426,7 @@ export async function getTopTracks(
       uri: t.uri,
       popularity: t.popularity ?? 50,
       previewUrl: t.preview_url,
-      explicit: Boolean(t.explicit),
-      playCount: calculateTrackPlays(index, timeRange, t.popularity ?? 50)
+      explicit: Boolean(t.explicit)
     }))
     return { items }
   } catch (err: any) {
@@ -466,99 +442,75 @@ export async function getTopArtists(
   if (!token) return { items: [] }
 
   try {
-    const [artistsRes, tracksRes] = await Promise.all([
-      fetch(`https://api.spotify.com/v1/me/top/artists?time_range=${timeRange}&limit=${limit}`, {
-        headers: getHeaders()
-      }),
-      getTopTracks(timeRange, 50)
-    ])
+    const res = await fetch(`https://api.spotify.com/v1/me/top/artists?time_range=${timeRange}&limit=${limit}`, {
+      headers: getHeaders()
+    })
 
-    if (artistsRes.status === 401) {
+    if (res.status === 401) {
       localStorage.removeItem('spotify_token')
       return { items: [], error: 'Session expired' }
     }
-    if (artistsRes.status === 403) {
+    if (res.status === 403) {
       return { items: [], insufficientScope: true, error: 'Permission needed to access top artists.' }
     }
-    if (!okStatus(artistsRes.status)) return { items: [], error: `Failed to load top artists (${artistsRes.status})` }
+    if (!okStatus(res.status)) return { items: [], error: `Failed to load top artists (${res.status})` }
 
-    const data = await artistsRes.json()
-    const topTracksItems = tracksRes.items || []
-
-    const items: TopArtistItem[] = (data.items || []).slice(0, limit).map((a: any, index: number) => {
-      const artistTracks = topTracksItems.filter(t => t.artists.toLowerCase().includes(a.name.toLowerCase()))
-      const trackPlaysSum = artistTracks.reduce((sum, t) => sum + t.playCount, 0)
-      return {
-        id: a.id,
-        name: a.name,
-        genres: a.genres || [],
-        images: a.images?.map((img: any) => img.url) || [],
-        imageUrl: a.images?.[0]?.url || '/mirage.webp',
-        popularity: a.popularity ?? 50,
-        followers: a.followers?.total,
-        uri: a.uri,
-        playCount: calculateArtistPlays(index, timeRange, trackPlaysSum)
-      }
-    })
+    const data = await res.json()
+    const items: TopArtistItem[] = (data.items || []).slice(0, limit).map((a: any) => ({
+      id: a.id,
+      name: a.name,
+      genres: a.genres || [],
+      images: a.images?.map((img: any) => img.url) || [],
+      imageUrl: a.images?.[0]?.url || '/mirage.webp',
+      popularity: a.popularity ?? 50,
+      followers: a.followers?.total,
+      uri: a.uri
+    }))
     return { items }
   } catch (err: any) {
     return { items: [], error: err?.message || 'Error fetching top artists' }
   }
 }
 
+export function aggregateTopAlbums(tracks: TopTrackItem[], limit = 5): TopAlbumItem[] {
+  const albumMap = new Map<string, TopAlbumItem>()
+
+  for (const track of tracks) {
+    if (!track.albumId) continue
+    const existing = albumMap.get(track.albumId)
+    if (existing) {
+      existing.tracksCountInTop += 1
+      existing.popularity = Math.max(existing.popularity, track.popularity)
+    } else {
+      albumMap.set(track.albumId, {
+        id: track.albumId,
+        name: track.albumName,
+        artist: track.artists,
+        coverUrl: track.coverUrl,
+        uri: `spotify:album:${track.albumId}`,
+        tracksCountInTop: 1,
+        popularity: track.popularity
+      })
+    }
+  }
+
+  return Array.from(albumMap.values())
+    .sort((a, b) => b.tracksCountInTop - a.tracksCountInTop || b.popularity - a.popularity)
+    .slice(0, limit)
+}
+
 export async function getTopAlbums(
   timeRange: TimeRange = 'short_term',
-  limit = 5
+  limit = 5,
+  existingTracks?: TopTrackItem[]
 ): Promise<{ items: TopAlbumItem[]; error?: string; insufficientScope?: boolean }> {
-  const token = getAccessToken()
-  if (!token) return { items: [] }
-
-  try {
-    const tracksRes = await getTopTracks(timeRange, 50)
-    if (tracksRes.insufficientScope) return { items: [], insufficientScope: true, error: tracksRes.error }
-    if (!tracksRes.items || tracksRes.items.length === 0) return { items: [] }
-
-    const albumMap = new Map<string, { album: TopAlbumItem; score: number; count: number; totalPlays: number }>()
-
-    tracksRes.items.forEach((track, index) => {
-      if (!track.albumId) return
-      const weight = Math.max(1, 50 - index)
-      const existing = albumMap.get(track.albumId)
-      if (existing) {
-        existing.score += weight
-        existing.count += 1
-        existing.totalPlays += track.playCount
-      } else {
-        albumMap.set(track.albumId, {
-          score: weight,
-          count: 1,
-          totalPlays: track.playCount,
-          album: {
-            id: track.albumId,
-            name: track.albumName,
-            artist: track.artists,
-            coverUrl: track.coverUrl,
-            uri: `spotify:album:${track.albumId}`,
-            tracksCountInTop: 1,
-            playCount: track.playCount
-          }
-        })
-      }
-    })
-
-    const sortedAlbums = Array.from(albumMap.values())
-      .sort((a, b) => b.totalPlays - a.totalPlays || b.score - a.score)
-      .slice(0, limit)
-      .map(entry => ({
-        ...entry.album,
-        tracksCountInTop: entry.count,
-        playCount: entry.totalPlays
-      }))
-
-    return { items: sortedAlbums }
-  } catch (err: any) {
-    return { items: [], error: err?.message || 'Error fetching top albums' }
+  if (existingTracks && existingTracks.length > 0) {
+    return { items: aggregateTopAlbums(existingTracks, limit) }
   }
+
+  const tracksRes = await getTopTracks(timeRange, 50)
+  if (tracksRes.insufficientScope) return { items: [], insufficientScope: true, error: tracksRes.error }
+  return { items: aggregateTopAlbums(tracksRes.items || [], limit) }
 }
 
 export async function getRecentlyPlayed(
@@ -601,17 +553,13 @@ export async function getRecentlyPlayed(
   }
 }
 
-// Compact preview collection for turntable library
 export const DEMO_ALBUMS: MediaItem[] = [
   { id: 'demo-1', title: 'Random Access Memories', subtitle: 'Daft Punk', year: '2013', coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/e8/43/5f/e8435ffa-b6b9-b171-40ab-4ff3959ab661/886443919266.jpg/600x600bb.jpg', uri: 'spotify:album:4m2880jivSbbyEGAKfITCa', type: 'album', tracksCount: 13 },
   { id: 'demo-2', title: 'The Dark Side of the Moon', subtitle: 'Pink Floyd', year: '1973', coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/49/86/18/49861852-877b-0992-fa27-58b25fa032b5/196589805232.jpg/600x600bb.jpg', uri: 'spotify:album:4LH4d3cOWNNXdsqFd4G7gv', type: 'album', tracksCount: 10 },
-  { id: 'demo-3', title: 'Currents', subtitle: 'Tame Impala', year: '2015', coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/a8/2e/b4/a82eb490-f30a-a321-461a-0383c88fec95/15UMGIM23316.rgb.jpg/600x600bb.jpg', uri: 'spotify:album:79dL7FLiJFOO0EoehUHQBv', type: 'album', tracksCount: 13 },
-  { id: 'demo-4', title: 'Rumours', subtitle: 'Fleetwood Mac', year: '1977', coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/4d/13/ba/4d13bac3-d3d5-7581-2c74-034219eadf2b/081227970949.jpg/600x600bb.jpg', uri: 'spotify:album:1bt6q2S3hk52zNVq0MYYoq', type: 'album', tracksCount: 11 },
-  { id: 'demo-5', title: 'Abbey Road', subtitle: 'The Beatles', year: '1969', coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/48/53/43/485343e3-dd6a-0034-faec-f4b6403f8108/13UMGIM63890.rgb.jpg/600x600bb.jpg', uri: 'spotify:album:0ETFjA39vXvRwEhG97Y6TN', type: 'album', tracksCount: 17 }
+  { id: 'demo-3', title: 'Currents', subtitle: 'Tame Impala', year: '2015', coverUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/a8/2e/b4/a82eb490-f30a-a321-461a-0383c88fec95/15UMGIM23316.rgb.jpg/600x600bb.jpg', uri: 'spotify:album:79dL7FLiJFOO0EoehUHQBv', type: 'album', tracksCount: 13 }
 ]
 
 export const DEMO_PLAYLISTS: MediaItem[] = [
   { id: 'demo-pl-1', title: 'Late Night Vinyl Sessions', subtitle: 'By Spinback Curators', coverUrl: 'https://images.unsplash.com/photo-1539375665275-f9de415ef9ac?w=600&auto=format&fit=crop&q=80', uri: 'spotify:playlist:37i9dQZF1DXcBWIGoYBM5M', type: 'playlist', tracksCount: 10 },
-  { id: 'demo-pl-2', title: 'Analog Warmth & Chill', subtitle: 'By Audiophile Vault', coverUrl: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=600&auto=format&fit=crop&q=80', uri: 'spotify:playlist:37i9dQZF1DX4WYpdgoIcn6', type: 'playlist', tracksCount: 8 },
-  { id: 'demo-pl-3', title: 'Japanese City Pop & Funk', subtitle: 'By Tokyo Groove', coverUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop&q=80', uri: 'spotify:playlist:37i9dQZF1DXdbXrPNafg9d', type: 'playlist', tracksCount: 8 }
+  { id: 'demo-pl-2', title: 'Analog Warmth & Chill', subtitle: 'By Audiophile Vault', coverUrl: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=600&auto=format&fit=crop&q=80', uri: 'spotify:playlist:37i9dQZF1DX4WYpdgoIcn6', type: 'playlist', tracksCount: 8 }
 ]

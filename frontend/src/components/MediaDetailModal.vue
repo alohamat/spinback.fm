@@ -31,7 +31,6 @@ const emit = defineEmits<{
 
 const router = useRouter()
 
-// Dynamic Palette extracted from album cover
 const colors = reactive({
   primary: '#141418',
   secondary: '#22222a',
@@ -59,13 +58,8 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
-onMounted(() => {
-  window.addEventListener('keydown', onKeydown)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', onKeydown)
-})
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
 const formattedTotalDuration = computed(() => {
   if (!props.details) return ''
@@ -77,11 +71,6 @@ function isTrackPlaying(track: TrackItem): boolean {
   if (props.currentlyPlayingUri && props.currentlyPlayingUri === track.uri) return true
   if (props.currentTrackTitle && track.name && props.currentTrackTitle.toLowerCase().trim() === track.name.toLowerCase().trim()) return true
   return false
-}
-
-function isMediaPlaying(): boolean {
-  if (!props.details || !props.isPlaying) return false
-  return props.currentlyPlayingUri === props.details.uri
 }
 
 function goToTurntable() {
@@ -100,7 +89,6 @@ function goToTurntable() {
         aria-modal="true"
         role="dialog"
       >
-        <!-- Minimalist Modal Container infused with Album Palette -->
         <div 
           class="modal-card relative w-full max-w-2xl max-h-[88vh] flex flex-col rounded-2xl overflow-hidden text-white my-auto animate-scale-up"
           :style="{
@@ -110,10 +98,8 @@ function goToTurntable() {
           }"
           @click.stop
         >
-          <!-- Ambient Fluid Glow Background -->
           <div class="ambient-glow absolute inset-0 pointer-events-none" />
 
-          <!-- Minimalist Top Close Button -->
           <button 
             @click="emit('close')"
             class="absolute top-4 right-4 z-30 w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 text-white/50 hover:text-white flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
@@ -124,51 +110,37 @@ function goToTurntable() {
             </svg>
           </button>
 
-          <!-- Loading State -->
           <div v-if="isLoading" class="flex flex-col items-center justify-center py-24 gap-3">
             <div class="w-8 h-8 rounded-full border-2 border-white/20 border-t-white/80 animate-spin" />
             <p class="text-xs text-white/40 tracking-wider">Loading tracks...</p>
           </div>
 
-          <!-- Content when Loaded -->
           <template v-else-if="details">
-            <!-- MINIMALIST HERO HEADER -->
             <div class="relative z-10 flex flex-col sm:flex-row items-center sm:items-start gap-5 p-6 sm:p-7 border-b border-white/6 shrink-0">
-              
-              <!-- Clean Album Artwork -->
               <div class="relative w-32 h-32 sm:w-36 sm:h-36 shrink-0 group">
-               
-
-                <!-- Clean Sleeve Cover -->
                 <div class="relative z-10 w-full h-full rounded-xl overflow-hidden shadow-xl border border-white/10 bg-[#161616]">
                   <img :src="details.coverUrl" :alt="details.title" class="w-full h-full object-cover" />
                   <div class="sleeve-sheen absolute inset-0 pointer-events-none" />
                 </div>
               </div>
 
-              <!-- Typography & Clean Metadata -->
               <div class="flex-1 flex flex-col items-center sm:items-start text-center sm:text-left min-w-0 pr-6">
-                <!-- Eyebrow -->
                 <span class="text-[10px] font-semibold tracking-widest uppercase text-white/40">
                   {{ details.type }}{{ details.year ? ` · ${details.year}` : '' }}
                 </span>
 
-                <!-- Title -->
                 <h2 class="text-xl sm:text-2xl font-bold text-white mt-1 leading-snug tracking-tight line-clamp-2">
                   {{ details.title }}
                 </h2>
 
-                <!-- Subtitle / Artist -->
                 <p class="text-xs sm:text-sm font-medium text-white/60 mt-0.5">
                   {{ details.subtitle }}
                 </p>
 
-                <!-- Clean Metadata: Song count & Album Duration -->
                 <p class="text-xs text-white/40 mt-2 font-medium">
                   {{ details.tracksCount }} songs · {{ formattedTotalDuration }}
                 </p>
 
-                <!-- Action Buttons -->
                 <div class="flex items-center gap-2.5 mt-4">
                   <button 
                     @click="emit('play-all', details)"
@@ -190,7 +162,6 @@ function goToTurntable() {
               </div>
             </div>
 
-            <!-- MINIMALIST SONGS LIST -->
             <div class="relative z-10 flex-1 overflow-y-auto px-3 sm:px-6 py-3 custom-scrollbar">
               <div class="divide-y divide-white/4">
                 <div 
@@ -200,21 +171,16 @@ function goToTurntable() {
                   class="track-row group flex items-center justify-between py-2 px-3 rounded-lg transition-colors cursor-pointer"
                   :class="{ 'track-active': isTrackPlaying(track) }"
                 >
-                  <!-- Track Number / Play Indicator & Title -->
                   <div class="flex items-center gap-3.5 min-w-0 pr-4">
-                    <!-- Track Number or Mini Equalizer -->
                     <div class="w-5 flex items-center justify-center shrink-0">
-                      <!-- Playing Equalizer Bars -->
                       <div v-if="isTrackPlaying(track)" class="flex items-end gap-0.5 h-3">
                         <span class="eq-mini eq-1 w-0.5 rounded-full" />
                         <span class="eq-mini eq-2 w-0.5 rounded-full" />
                         <span class="eq-mini eq-3 w-0.5 rounded-full" />
                       </div>
-                      <!-- Hover Play Icon -->
-                      <svg class="w-3 h-3 text-white/90 hidden group-hover:block ml-0.5 fill-current" viewBox="0 0 24 24">
+                      <svg v-else class="w-3 h-3 text-white/90 hidden group-hover:block ml-0.5 fill-current" viewBox="0 0 24 24">
                         <path d="M8 5v14l11-7z" />
                       </svg>
-                      <!-- Number -->
                       <span 
                         v-if="!isTrackPlaying(track)" 
                         class="text-[11px] font-medium text-white/30 group-hover:hidden"
@@ -223,7 +189,6 @@ function goToTurntable() {
                       </span>
                     </div>
 
-                    <!-- Title & Artist -->
                     <div class="min-w-0">
                       <div class="flex items-center gap-1.5">
                         <span 
@@ -242,14 +207,12 @@ function goToTurntable() {
                     </div>
                   </div>
 
-                  <!-- Track Duration -->
                   <span class="text-xs font-mono text-white/35 group-hover:text-white/70 shrink-0 tabular-nums">
                     {{ formatTime(track.durationMs) }}
                   </span>
                 </div>
               </div>
 
-              <!-- Empty Tracks Fallback -->
               <div v-if="details.tracks.length === 0" class="py-12 text-center text-xs text-white/40 flex flex-col items-center gap-2">
                 <p>No songs available to preview for this playlist.</p>
                 <button 
@@ -268,7 +231,6 @@ function goToTurntable() {
 </template>
 
 <style scoped>
-/* Modal card with palette infusion */
 .modal-card {
   background: radial-gradient(
     circle at top left,
@@ -282,7 +244,6 @@ function goToTurntable() {
     0 0 60px -20px color-mix(in srgb, var(--c1) 25%, transparent);
 }
 
-/* Subtle ambient glow matching palette */
 .ambient-glow {
   background: radial-gradient(
     circle at 20% 15%,
@@ -291,7 +252,6 @@ function goToTurntable() {
   );
 }
 
-/* Play button tinted by album palette */
 .play-button {
   background: color-mix(in srgb, var(--c2) 30%, #f4f4f5);
 }
@@ -299,7 +259,6 @@ function goToTurntable() {
   background: #ffffff;
 }
 
-/* Track Row styles */
 .track-row:hover {
   background: color-mix(in srgb, var(--c1) 25%, rgba(255, 255, 255, 0.04));
 }
@@ -312,27 +271,6 @@ function goToTurntable() {
   background: color-mix(in srgb, var(--c2) 50%, #ffffff);
 }
 
-/* Vinyl textures */
-.vinyl-groove-rings {
-  background: repeating-radial-gradient(
-    circle at center,
-    #0c0c0c 0,
-    #141414 1px,
-    #0a0a0a 2px,
-    #171717 3px,
-    #080808 4px
-  );
-}
-
-.vinyl-spinning {
-  animation: vinyl-spin 9s linear infinite;
-}
-
-@keyframes vinyl-spin {
-  from { transform: translateY(-50%) translateX(12px) rotate(0deg); }
-  to { transform: translateY(-50%) translateX(12px) rotate(360deg); }
-}
-
 .sleeve-sheen {
   background: linear-gradient(
     135deg,
@@ -342,7 +280,6 @@ function goToTurntable() {
   );
 }
 
-/* Mini equalizer animation */
 .eq-mini {
   animation: eq-bounce 0.8s ease-in-out infinite alternate;
 }
@@ -355,7 +292,6 @@ function goToTurntable() {
   100% { transform: scaleY(1); }
 }
 
-/* Animations */
 .modal-fade-enter-active,
 .modal-fade-leave-active {
   transition: opacity 0.2s ease-out;
@@ -375,7 +311,6 @@ function goToTurntable() {
   animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
   width: 5px;
 }

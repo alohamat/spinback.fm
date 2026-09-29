@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import AlbumFrame from '@/components/AlbumFrame.vue'
 import ArtistFrame from '@/components/ArtistFrame.vue'
 import RecentTracksList from '@/components/RecentTracksList.vue'
@@ -10,6 +10,7 @@ import {
   getTopTracks, 
   getTopArtists, 
   getTopAlbums, 
+  aggregateTopAlbums,
   getRecentlyPlayed, 
   playTrack,
   playContext,
@@ -22,32 +23,20 @@ import {
 import { handleRedirectCallback, loginWithSpotify, logout, getAccessToken } from '@/services/auth'
 import { extractPaletteFromCover } from '@/utils/colorPalette'
 
-const router = useRouter()
+const route = useRoute()
 
-// Authentication & Loading state
 const isAuthenticated = ref(false)
 const isLoading = ref(true)
 const isScopeMissing = ref(false)
 
-// Time range filter: 'short_term' (4 weeks), 'medium_term' (6 months), 'long_term' (1 year)
 const selectedTimeRange = ref<TimeRange>('short_term')
-
-// Active section view filter ('all' | 'artists' | 'albums' | 'tracks' | 'recent')
 const activeSection = ref<'all' | 'artists' | 'albums' | 'tracks' | 'recent'>('all')
 
-// Statistics datasets
-const rawTopTracks = ref<TopTrackItem[]>([])
-const rawTopArtists = ref<TopArtistItem[]>([])
-const rawTopAlbums = ref<TopAlbumItem[]>([])
-const rawRecentTracks = ref<RecentlyPlayedItem[]>([])
+const topTracks = ref<TopTrackItem[]>([])
+const topArtists = ref<TopArtistItem[]>([])
+const topAlbums = ref<TopAlbumItem[]>([])
+const recentTracks = ref<RecentlyPlayedItem[]>([])
 
-// Display strict limits: 5 artists, 5 albums, 10 top songs, 10 recent songs
-const topArtists = computed(() => rawTopArtists.value.slice(0, 5))
-const topAlbums = computed(() => rawTopAlbums.value.slice(0, 5))
-const topTracks = computed(() => rawTopTracks.value.slice(0, 10))
-const recentTracks = computed(() => rawRecentTracks.value.slice(0, 10))
-
-// Currently playing track state (defines the page's color theme!)
 const currentTrack = reactive({
   title: 'Analog Space',
   artist: 'Spinback Ambient',
@@ -57,7 +46,6 @@ const currentTrack = reactive({
   uri: ''
 })
 
-// Dynamic background color palette
 const colors = reactive({ 
   primary: '#12131a', 
   secondary: '#25213b', 
@@ -66,7 +54,6 @@ const colors = reactive({
 
 let pollInterval: ReturnType<typeof setInterval> | null = null
 
-// Notification Toast
 const toast = reactive({
   show: false,
   message: '',
@@ -84,7 +71,6 @@ function showToast(message: string, type: 'info' | 'success' | 'warning' | 'erro
   }, 4500)
 }
 
-// Watch coverUrl to extract palette dynamically
 watch(() => currentTrack.coverUrl, (newUrl) => {
   if (!newUrl) return
   extractPaletteFromCover(newUrl, (extracted) => {
@@ -94,7 +80,6 @@ watch(() => currentTrack.coverUrl, (newUrl) => {
   })
 }, { immediate: true })
 
-// Reload stats whenever selectedTimeRange changes
 watch(selectedTimeRange, async (newRange) => {
   if (isAuthenticated.value) {
     await loadTimeRangedStats(newRange)
@@ -122,7 +107,7 @@ onUnmounted(() => {
 async function syncSpotifyPlayback() {
   try {
     const state = await getPlaybackState()
-    if (!state || !state.item) return
+    if (!state?.item) return
 
     currentTrack.title = state.item.name || 'Unknown Track'
     currentTrack.artist = state.item.artists?.map((a: any) => a.name).join(', ') || 'Unknown Artist'
@@ -149,7 +134,6 @@ async function loadAllStats() {
       loadRecentlyPlayed()
     ])
 
-    // If no song is currently playing, set initial palette from top track or album cover
     if (!currentTrack.isPlaying && topTracks.value.length > 0 && currentTrack.coverUrl === '/mirage.webp') {
       currentTrack.title = topTracks.value[0]?.name || currentTrack.title
       currentTrack.artist = topTracks.value[0]?.artists || currentTrack.artist
@@ -163,24 +147,24 @@ async function loadAllStats() {
 
 async function loadTimeRangedStats(range: TimeRange) {
   try {
-    const [tracksRes, artistsRes, albumsRes] = await Promise.all([
-      getTopTracks(range, 10),
-      getTopArtists(range, 5),
-      getTopAlbums(range, 5)
+    const [tracksRes, artistsRes] = await Promise.all([
+      getTopTracks(range, 50),
+      getTopArtists(range, 5)
     ])
 
-    if (tracksRes.insufficientScope || artistsRes.insufficientScope || albumsRes.insufficientScope) {
+    if (tracksRes.insufficientScope || artistsRes.insufficientScope) {
       isScopeMissing.value = true
     }
 
-    rawTopTracks.value = tracksRes.items || []
-    rawTopArtists.value = artistsRes.items || []
-    rawTopAlbums.value = albumsRes.items || []
+    const allTracks = tracksRes.items || []
+    topTracks.value = allTracks.slice(0, 10)
+    topArtists.value = artistsRes.items || []
+    topAlbums.value = aggregateTopAlbums(allTracks, 5)
   } catch (e) {
     console.error('Error loading time ranged stats:', e)
-    rawTopTracks.value = []
-    rawTopArtists.value = []
-    rawTopAlbums.value = []
+    topTracks.value = []
+    topArtists.value = []
+    topAlbums.value = []
   }
 }
 
@@ -190,16 +174,15 @@ async function loadRecentlyPlayed() {
     if (res.insufficientScope) {
       isScopeMissing.value = true
     }
-    rawRecentTracks.value = res.items || []
+    recentTracks.value = res.items || []
   } catch (e) {
     console.error('Error loading recently played:', e)
-    rawRecentTracks.value = []
+    recentTracks.value = []
   }
 }
 
 async function handlePlayTrack(track: TopTrackItem | RecentlyPlayedItem) {
   const trackName = 'name' in track ? track.name : track.trackName
-  
   if (!isAuthenticated.value) return
 
   showToast(`Spinning "${trackName}"...`, 'info')
@@ -234,7 +217,7 @@ async function handlePlayAlbum(album: TopAlbumItem) {
 }
 
 function handleSelectArtist(artist: TopArtistItem) {
-  showToast(`Top artist: ${artist.name} (${artist.playCount} plays)`, 'info')
+  showToast(`Top artist: ${artist.name} (${artist.popularity}% popularity)`, 'info')
 }
 </script>
 
@@ -248,14 +231,11 @@ function handleSelectArtist(artist: TopArtistItem) {
       backgroundColor: colors.primary
     }"
   >
-    <!-- Fluid Animated Background Blobs -->
     <div class="blob blob-1" />
     <div class="blob blob-2" />
     <div class="blob blob-3" />
 
-    <!-- Top Navigation Header -->
     <header class="relative z-50 flex md:flex-row flex-col gap-2 items-center justify-between md:px-12 py-5 w-full">
-      <!-- Logo Branding -->
       <router-link to="/" class="flex items-center gap-3 group cursor-pointer">
         <div class="relative w-8 h-8 rounded-full bg-black/60 border border-white/20 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
           <div class="w-3.5 h-3.5 rounded-full bg-[#1DB954] shadow-[0_0_8px_#1DB954]" />
@@ -265,13 +245,12 @@ function handleSelectArtist(artist: TopArtistItem) {
         </span>
       </router-link>
 
-      <!-- Page Switcher Pill with Statistics on the left of Turntable/Library -->
       <nav class="flex items-center p-1 md:absolute md:left-1/2 md:-translate-x-1/2 rounded-full bg-black/40 border border-white/10 backdrop-blur-xl shadow-xl">
         <router-link 
           to="/stats"
           :class="[
             'flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all cursor-pointer',
-            $route.path === '/stats'
+            route.path === '/stats'
               ? 'bg-white/15 text-white shadow-md border border-white/10'
               : 'text-white/60 hover:text-white'
           ]"
@@ -283,7 +262,7 @@ function handleSelectArtist(artist: TopArtistItem) {
           to="/"
           :class="[
             'flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all cursor-pointer',
-            $route.path === '/'
+            route.path === '/'
               ? 'bg-white/15 text-white shadow-md border border-white/10'
               : 'text-white/60 hover:text-white'
           ]"
@@ -295,7 +274,7 @@ function handleSelectArtist(artist: TopArtistItem) {
           to="/library"
           :class="[
             'flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all cursor-pointer',
-            $route.path === '/library'
+            route.path === '/library'
               ? 'bg-white/15 text-white shadow-md border border-white/10'
               : 'text-white/60 hover:text-white'
           ]"
@@ -304,31 +283,27 @@ function handleSelectArtist(artist: TopArtistItem) {
         </router-link>
       </nav>
 
-      <!-- Auth Controls -->
       <div class="flex items-center gap-3">
-        <template v-if="isAuthenticated">
-          <button 
-            @click="logout"
-            class="text-xs sm:text-sm text-white/50 hover:text-white transition-colors cursor-pointer px-3 py-1.5 rounded-full hover:bg-white/5"
-          >
-            Log-out
-          </button>
-        </template>
-        <template v-else>
-          <button 
-            @click="loginWithSpotify"
-            class="flex items-center gap-2 bg-[#1DB954] hover:bg-[#1ed760] text-black text-xs sm:text-sm font-bold px-4 py-2 rounded-full transition-transform hover:scale-105 cursor-pointer shadow-lg shadow-green-500/20"
-          >
-            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
-              <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.503 17.308c-.218.358-.683.473-1.04.255-2.853-1.743-6.444-2.138-10.673-1.171-.409.094-.817-.16-.91-.569-.094-.408.16-.816.568-.91 4.634-1.059 8.604-.615 11.796 1.336.357.218.472.683.255 1.04.004.019.004.019.004.019zm1.468-3.262c-.274.446-.86.588-1.306.314-3.266-2.008-8.243-2.59-12.106-1.418-.503.153-1.037-.134-1.19-.637-.152-.503.134-1.037.637-1.19 4.417-1.34 9.907-.693 13.65 1.614.446.275.589.86.315 1.307v.03zm.126-3.411c-3.916-2.325-10.37-2.54-14.126-1.399-.6.182-1.239-.161-1.421-.762-.182-.6.161-1.24.762-1.422 4.312-1.309 11.442-1.054 15.949 1.62.541.321.721 1.023.4 1.564-.321.54-1.023.72-1.564.4z"/>
-            </svg>
-            <span>Login</span>
-          </button>
-        </template>
+        <button 
+          v-if="isAuthenticated" 
+          @click="logout" 
+          class="text-xs sm:text-sm text-white/50 hover:text-white transition-colors cursor-pointer px-3 py-1.5 rounded-full hover:bg-white/5"
+        >
+          Log-out
+        </button>
+        <button 
+          v-else
+          @click="loginWithSpotify" 
+          class="flex items-center gap-2 bg-[#1DB954] hover:bg-[#1ed760] text-black text-xs sm:text-sm font-bold px-4 py-2 rounded-full transition-transform hover:scale-105 cursor-pointer shadow-lg shadow-green-500/20"
+        >
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.503 17.308c-.218.358-.683.473-1.04.255-2.853-1.743-6.444-2.138-10.673-1.171-.409.094-.817-.16-.91-.569-.094-.408.16-.816.568-.91 4.634-1.059 8.604-.615 11.796 1.336.357.218.472.683.255 1.04.004.019.004.019.004.019zm1.468-3.262c-.274.446-.86.588-1.306.314-3.266-2.008-8.243-2.59-12.106-1.418-.503.153-1.037-.134-1.19-.637-.152-.503.134-1.037.637-1.19 4.417-1.34 9.907-.693 13.65 1.614.446.275.589.86.315 1.307v.03zm.126-3.411c-3.916-2.325-10.37-2.54-14.126-1.399-.6.182-1.239-.161-1.421-.762-.182-.6.161-1.24.762-1.422 4.312-1.309 11.442-1.054 15.949 1.62.541.321.721 1.023.4 1.564-.321.54-1.023.72-1.564.4z"/>
+          </svg>
+          <span>Login</span>
+        </button>
       </div>
     </header>
 
-    <!-- UNLOGGED STATE: ONLY SHOW LOGIN -->
     <div 
       v-if="!isAuthenticated" 
       class="relative z-20 flex flex-col items-center justify-center flex-1 max-w-md mx-auto px-6 py-24 text-center my-auto"
@@ -359,9 +334,7 @@ function handleSelectArtist(artist: TopArtistItem) {
       </button>
     </div>
 
-    <!-- LOGGED IN STATE: FULL STATISTICS DASHBOARD -->
     <template v-else>
-      <!-- Scope Reconnect Alert (if user has outdated scopes) -->
       <div 
         v-if="isScopeMissing" 
         class="relative z-40 mx-auto mb-4 max-w-2xl px-5 py-3 rounded-2xl bg-amber-500/20 border border-amber-400/30 backdrop-blur-md flex flex-wrap items-center justify-between gap-4 text-xs text-amber-200 shadow-xl"
@@ -381,10 +354,7 @@ function handleSelectArtist(artist: TopArtistItem) {
         </button>
       </div>
 
-      <!-- Main Container -->
       <div class="relative z-20 flex flex-col flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 py-6 pb-24">
-        
-        <!-- Top Hero Section: Title, Period Selector & Now Playing Palette Bar -->
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-white/10">
           <div class="flex flex-col gap-2">
             <div class="flex items-center gap-2">
@@ -398,9 +368,7 @@ function handleSelectArtist(artist: TopArtistItem) {
             </p>
           </div>
 
-          <!-- Right Side: Time Range Selector & Now Playing Theme Pill -->
           <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <!-- Time Range Selector (4 weeks, 6 months, 1 year) -->
             <div class="flex flex-col gap-1.5">
               <span class="text-[10px] font-mono text-white/40 uppercase tracking-wider">Selectable Period</span>
               <div class="inline-flex p-1 rounded-full bg-black/40 border border-white/15 backdrop-blur-xl shadow-lg">
@@ -445,7 +413,6 @@ function handleSelectArtist(artist: TopArtistItem) {
               </div>
             </div>
 
-            <!-- Live Color Theme Indicator Pill -->
             <div class="flex flex-col gap-1.5">
               <span class="text-[10px] font-mono text-white/40 uppercase tracking-wider">Last Song</span>
               <div class="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-black/40 border border-white/15 backdrop-blur-xl shadow-lg">
@@ -464,7 +431,6 @@ function handleSelectArtist(artist: TopArtistItem) {
                   </span>
                 </div>
 
-                <!-- Animated Equalizer Pulse -->
                 <div class="flex items-end gap-0.5 h-3 ml-1 shrink-0">
                   <span class="w-0.5 bg-[#1DB954] h-full animate-[pulse_0.6s_ease-in-out_infinite]" />
                   <span class="w-0.5 bg-[#1DB954] h-2 animate-[pulse_0.4s_ease-in-out_infinite_0.2s]" />
@@ -475,7 +441,6 @@ function handleSelectArtist(artist: TopArtistItem) {
           </div>
         </div>
 
-        <!-- Quick Section Anchor Tabs -->
         <div class="flex items-center gap-2 overflow-x-auto py-4 scrollbar-none border-b border-white/5">
           <button
             type="button"
@@ -543,14 +508,12 @@ function handleSelectArtist(artist: TopArtistItem) {
           </button>
         </div>
 
-        <!-- Loading Spinner -->
         <div v-if="isLoading" class="flex flex-col items-center justify-center py-24 gap-4">
           <div class="w-10 h-10 border-2 border-white/20 border-t-[#1DB954] rounded-full animate-spin" />
           <span class="text-xs font-mono text-white/50">Analyzing your Spotify statistics...</span>
         </div>
 
         <template v-else>
-          <!-- SECTION 1: TOP ARTISTS ("stylized frames" - exactly 5) -->
           <section 
             v-if="activeSection === 'all' || activeSection === 'artists'"
             class="mt-10 flex flex-col gap-5"
@@ -562,13 +525,12 @@ function handleSelectArtist(artist: TopArtistItem) {
                   <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-white">Top 5 Artists</h2>
                 </div>
                 <p class="text-xs text-white/50 font-light mt-0.5">
-                Your 5 most player artists for this {{ selectedTimeRange === 'short_term' ? '4-week' : selectedTimeRange === 'medium_term' ? '6-month' : '1-year' }} period
+                  Your 5 most played artists for this {{ selectedTimeRange === 'short_term' ? '4-week' : selectedTimeRange === 'medium_term' ? '6-month' : '1-year' }} period
                 </p>
               </div>
               <span class="text-xs font-mono text-white/40">{{ topArtists.length }} artists</span>
             </div>
 
-            <!-- Stylized Frames Responsive Grid for 5 Artists -->
             <div v-if="topArtists.length > 0" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-5">
               <ArtistFrame 
                 v-for="(artist, idx) in topArtists"
@@ -583,7 +545,6 @@ function handleSelectArtist(artist: TopArtistItem) {
             </div>
           </section>
 
-          <!-- SECTION 2: TOP ALBUMS ("also stylized frames" - exactly 5) -->
           <section 
             v-if="activeSection === 'all' || activeSection === 'albums'"
             class="mt-14 flex flex-col gap-5"
@@ -601,7 +562,6 @@ function handleSelectArtist(artist: TopArtistItem) {
               <span class="text-xs font-mono text-white/40">{{ topAlbums.length }} albums</span>
             </div>
 
-            <!-- Stylized Vinyl Frames Responsive Grid for 5 Albums -->
             <div v-if="topAlbums.length > 0" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-5">
               <AlbumFrame 
                 v-for="(album, idx) in topAlbums"
@@ -617,12 +577,10 @@ function handleSelectArtist(artist: TopArtistItem) {
             </div>
           </section>
 
-          <!-- SECTION 3: TOP 10 SONGS & 10 RECENT SONGS VERTICAL LIST -->
           <div 
             v-if="activeSection === 'all' || activeSection === 'tracks' || activeSection === 'recent'"
             class="mt-14 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10"
           >
-            <!-- Part A: Top 10 Songs (Most Played Songs) -->
             <section 
               v-if="activeSection === 'all' || activeSection === 'tracks'"
               class="flex flex-col gap-4"
@@ -651,7 +609,6 @@ function handleSelectArtist(artist: TopArtistItem) {
               </div>
             </section>
 
-            <!-- Part B: 10 Recent Songs ("a vertical list") -->
             <section 
               v-if="activeSection === 'all' || activeSection === 'recent'"
               class="flex flex-col gap-4"
@@ -681,11 +638,9 @@ function handleSelectArtist(artist: TopArtistItem) {
             </section>
           </div>
         </template>
-
       </div>
     </template>
 
-    <!-- Notification Toast -->
     <transition name="toast-fade">
       <div 
         v-if="toast.show" 

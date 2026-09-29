@@ -2,21 +2,23 @@ const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID
 const REDIRECT_URI = 'http://127.0.0.1:5173' 
 const SCOPES = 'user-read-playback-state user-modify-playback-state user-library-read playlist-read-private playlist-read-collaborative user-top-read user-read-recently-played'
 
-function generateRandomString(length: number) {
+function generateRandomString(length: number): string {
   const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
   const values = crypto.getRandomValues(new Uint8Array(length))
-  return values.reduce((acc, x) => acc + possible[x % possible.length], "")
+  return values.reduce((acc, x) => acc + possible[x % possible.length], '')
 }
 
-async function sha256(plain: string) {
+async function sha256(plain: string): Promise<ArrayBuffer> {
   const encoder = new TextEncoder()
   const data = encoder.encode(plain)
   return window.crypto.subtle.digest('SHA-256', data)
 }
 
-function base64encode(input: ArrayBuffer) {
+function base64encode(input: ArrayBuffer): string {
   return btoa(String.fromCharCode(...new Uint8Array(input)))
-    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
 }
 
 export async function loginWithSpotify() {
@@ -53,7 +55,7 @@ export async function handleRedirectCallback(): Promise<string | null> {
   const payload = new URLSearchParams({
     client_id: CLIENT_ID,
     grant_type: 'authorization_code',
-    code: code,
+    code,
     redirect_uri: REDIRECT_URI,
     code_verifier: codeVerifier || '',
   })
@@ -84,6 +86,6 @@ export function logout() {
   window.location.reload()
 }
 
-export function getAccessToken() {
+export function getAccessToken(): string | null {
   return localStorage.getItem('spotify_token')
 }

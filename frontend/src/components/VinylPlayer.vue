@@ -1,29 +1,29 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { formatTime } from '@/utils/formatTime'
-import {
-  PIVOT_X,
-  PIVOT_Y,
-  SWING_RANGE,
-  calcNaturalTipAngle,
-  calcNeedleTip,
-  calcRestAngle,
-  getAngleForProgress,
-  calcTrackProgress,
-  isNeedleOnDisc
-} from '@/utils/vinylMath'
 
 interface VinylPlayerProps {
-  title?: string; artist?: string; album?: string; year?: string
-  primaryColor?: string; secondaryColor?: string
-  isPlaying: boolean;
-  progressMs: number;
-  durationMs: number;
+  title?: string
+  artist?: string
+  album?: string
+  year?: string
+  primaryColor?: string
+  secondaryColor?: string
+  isPlaying: boolean
+  progressMs: number
+  durationMs: number
 }
+
 const props = withDefaults(defineProps<VinylPlayerProps>(), {
-  title: '', artist: '', album: '', year: '',
-  primaryColor: '#8e44ad', secondaryColor: '#e67e22',
-  isPlaying: false, progressMs: 0, durationMs: 0
+  title: '',
+  artist: '',
+  album: '',
+  year: '',
+  primaryColor: '#8e44ad',
+  secondaryColor: '#e67e22',
+  isPlaying: false,
+  progressMs: 0,
+  durationMs: 0
 })
 
 const emit = defineEmits<{
@@ -34,6 +34,75 @@ const emit = defineEmits<{
   (e: 'backward'): void
 }>()
 
+const containerRef = ref<HTMLElement | null>(null)
+const isDragging = ref(false)
+const dragAngle = ref(-62)
+const dragPercent = ref(0)
+
+const progressPercent = computed(() => {
+  if (props.durationMs <= 0) return 0
+  return Math.min(100, Math.max(0, (props.progressMs / props.durationMs) * 100))
+})
+
+const needleAngle = computed(() => {
+  if (!props.isPlaying) return -62
+  return -50 + (progressPercent.value / 100) * 34
+})
+
+const effectivePercent = computed(() => isDragging.value ? dragPercent.value : progressPercent.value)
+const effectiveAngle = computed(() => isDragging.value ? dragAngle.value : needleAngle.value)
+
+const displayProgressMs = computed(() => {
+  if (isDragging.value && props.durationMs > 0) {
+    return (dragPercent.value / 100) * props.durationMs
+  }
+  return props.progressMs
+})
+
+function updateNeedleFromPointer(e: PointerEvent) {
+  if (!containerRef.value) return
+  const rect = containerRef.value.getBoundingClientRect()
+  const pivotX = rect.left + rect.width * 0.8
+  const pivotY = rect.top
+  const angleDeg = Math.atan2(e.clientY - pivotY, e.clientX - pivotX) * (180 / Math.PI)
+  const angle = angleDeg - 124.5
+
+  const clamped = Math.max(-62, Math.min(-16, angle))
+  dragAngle.value = clamped
+
+  if (clamped <= -52) {
+    dragPercent.value = 0
+  } else {
+    dragPercent.value = Math.min(100, Math.max(0, ((clamped - (-50)) / 34) * 100))
+  }
+}
+
+function onNeedlePointerDown(e: PointerEvent) {
+  isDragging.value = true
+  ;(e.currentTarget as HTMLElement)?.setPointerCapture?.(e.pointerId)
+  updateNeedleFromPointer(e)
+}
+
+function onNeedlePointerMove(e: PointerEvent) {
+  if (!isDragging.value) return
+  updateNeedleFromPointer(e)
+}
+
+function onNeedlePointerUp(e: PointerEvent) {
+  if (!isDragging.value) return
+  isDragging.value = false
+  try {
+    ;(e.currentTarget as HTMLElement)?.releasePointerCapture?.(e.pointerId)
+  } catch {}
+
+  if (dragAngle.value < -54) {
+    emit('pause')
+  } else {
+    emit('seek', dragPercent.value)
+    emit('play')
+  }
+}
+
 function togglePlay() {
   if (props.isPlaying) {
     emit('pause')
@@ -42,277 +111,77 @@ function togglePlay() {
   }
 }
 
-const displayCurrentTime = computed(() => formatTime(props.progressMs))
-const displayDuration = computed(() => formatTime(props.durationMs))
-
-const containerRef = ref<HTMLDivElement | null>(null)
-const needleRef    = ref<HTMLImageElement | null>(null)
-const isDragging   = ref(false)
-const isReady      = ref(false)
-const isTouching   = ref(false)
-
-const vinylAngle = ref(0)
-let rAF: number | null = null
-let lastTime: DOMHighResTimeStamp | null = null
-
-function tick(t: DOMHighResTimeStamp) {
-  if (lastTime !== null) {
-    const dt = t - lastTime
-    
-    if (props.isPlaying && !isDragging.value) {
-      vinylAngle.value = (vinylAngle.value + (360 / 3000) * dt) % 360
-      
-      if (props.durationMs > 0 && isTouching.value) {
-         const progressPercentDelta = dt / props.durationMs
-         angle.value += SWING_RANGE * progressPercentDelta
-      }
-      
-      checkCollision()
-    }
-  }
-
-  lastTime = t
-  rAF = requestAnimationFrame(tick)
+function handleProgressBarClick(e: MouseEvent) {
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  const percent = Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100))
+  emit('seek', percent)
 }
-
-function startSpinning() {
-  if (rAF !== null) return
-  lastTime = null
-  rAF = requestAnimationFrame(tick)
-}
-
-function stopSpinning() {
-  if (rAF !== null) cancelAnimationFrame(rAF)
-  rAF = null
-  lastTime = null
-}
-
-const trackProgress = ref(0)
-
-function updateProgress() {
-  if (!containerRef.value) return
-  if (!isTouching.value) {
-    trackProgress.value = 0
-    return
-  }
-
-  const tip = calcTip()
-  const w = containerRef.value.offsetWidth
-  const h = containerRef.value.offsetHeight
-  trackProgress.value = calcTrackProgress(tip, w, h)
-}
-
-const needleSize = ref({ w: 0, h: 0 })
-const pivotPos   = ref({ x: 0, y: 0 })
-const angle      = ref(0)
-
-const naturalTipAngle = computed(() => calcNaturalTipAngle(needleSize.value.w, needleSize.value.h))
-
-const needleLeft = computed(() => pivotPos.value.x - PIVOT_X * needleSize.value.w)
-const needleTop  = computed(() => pivotPos.value.y - PIVOT_Y * needleSize.value.h)
-
-function calcTip() {
-  return calcNeedleTip(pivotPos.value, angle.value, needleSize.value)
-}
-
-function getRestAngle() {
-  if (!needleRef.value || !containerRef.value) return 0
-  const cw = containerRef.value.offsetWidth
-  const ch = containerRef.value.offsetHeight
-  const nw = needleRef.value.clientWidth
-  const nh = needleRef.value.clientHeight
-  if (!nw || !nh) return 0
-
-  const { angle: restAngle, pivot } = calcRestAngle(cw, ch, nw, nh)
-  pivotPos.value = pivot
-  return restAngle
-}
-
-function syncNeedleWithPlayback() {
-  if (!isReady.value || isDragging.value) return
-
-  if (props.isPlaying) {
-    angle.value = getAngleForProgress(props.progressMs, props.durationMs)
-    checkCollision()
-  } else {
-    if (!isTouching.value) {
-      angle.value = getRestAngle()
-      checkCollision()
-    }
-  }
-}
-
-watch(() => props.isPlaying, (newIsPlaying) => {
-  if (isDragging.value || !isReady.value) return
-  if (newIsPlaying) {
-    syncNeedleWithPlayback()
-  } else {
-    angle.value = getRestAngle()
-    checkCollision()
-  }
-})
-
-watch(() => props.progressMs, (newMs) => {
-  if (isDragging.value || props.durationMs <= 0 || !containerRef.value || !isReady.value) return
-
-  if (!isTouching.value && props.isPlaying) {
-    syncNeedleWithPlayback()
-    return
-  }
-
-  if (isTouching.value) {
-    const currentLocalMs = (trackProgress.value / 100) * props.durationMs
-    if (Math.abs(newMs - currentLocalMs) > 1500) {
-      angle.value = getAngleForProgress(newMs, props.durationMs)
-      checkCollision()
-    }
-  }
-})
-
-function checkCollision() {
-  if (!containerRef.value) return
-  const tip = calcTip()
-  const w = containerRef.value.offsetWidth
-  const h = containerRef.value.offsetHeight
-
-  const now = isNeedleOnDisc(tip, w, h)
-
-  if (now && !isTouching.value) {
-    isTouching.value = true
-    startSpinning()
-  } else if (!now && isTouching.value) {
-    isTouching.value = false
-    stopSpinning()
-  }
-
-  updateProgress()
-}
-
-function onMouseDown(e: MouseEvent) { isDragging.value = true; e.preventDefault() }
-
-function onMouseMove(e: MouseEvent) {
-  if (!isDragging.value || !containerRef.value) return
-  const rect = containerRef.value.getBoundingClientRect()
-  const mouseAngleDeg =
-    Math.atan2(e.clientY - rect.top - pivotPos.value.y, e.clientX - rect.left - pivotPos.value.x)
-    * (180 / Math.PI)
-  angle.value = mouseAngleDeg - naturalTipAngle.value
-  checkCollision()
-}
-
-function onMouseUp() { 
-  if (!isDragging.value) return
-  isDragging.value = false 
-  if (isTouching.value) {
-    emit('seek', trackProgress.value) 
-    emit('play')
-  } else {
-    angle.value = getRestAngle()
-    checkCollision()
-    emit('pause')
-  }
-}
-
-function initNeedle() {
-  if (!needleRef.value || !containerRef.value) return
-  const cw = containerRef.value.offsetWidth
-  const ch = containerRef.value.offsetHeight
-  const nw = needleRef.value.clientWidth
-  const nh = needleRef.value.clientHeight
-  if (!nw || !nh) return
-
-  needleSize.value = { w: nw, h: nh }
-  pivotPos.value   = { x: cw * 0.8, y: ch * 0 }
-
-  angle.value = getRestAngle()
-  isReady.value = true
-
-  syncNeedleWithPlayback()
-}
-
-let resizeObserver: ResizeObserver | null = null
-
-onMounted(() => {
-  window.addEventListener('mousemove', onMouseMove)
-  window.addEventListener('mouseup', onMouseUp)
-  window.addEventListener('resize', initNeedle)
-  if (containerRef.value && typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      initNeedle()
-    })
-    resizeObserver.observe(containerRef.value)
-  }
-  nextTick(initNeedle)
-})
-onUnmounted(() => {
-  window.removeEventListener('mousemove', onMouseMove)
-  window.removeEventListener('mouseup', onMouseUp)
-  window.removeEventListener('resize', initNeedle)
-  if (resizeObserver) resizeObserver.disconnect()
-  stopSpinning()
-})
 </script>
 
 <template>
   <div class="flex flex-col items-center gap-4">
-
     <div ref="containerRef" class="relative w-(--player-size,min(75vw,650px)) aspect-square shrink-0">
-
-      <div class="absolute inset-0" :style="{ transform: `rotate(${vinylAngle}deg)` }">
-        <img src="/vinyl.webp" alt="Vinyl" class="w-full h-full object-contain" />
+      <div 
+        class="absolute inset-0 cursor-pointer"
+        :class="{ 'animate-vinyl-spin': isPlaying }"
+        @click="togglePlay"
+      >
+        <img src="/vinyl.webp" alt="Vinyl" class="w-full h-full object-contain pointer-events-none select-none" />
 
         <div
           class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[34%] aspect-square rounded-full flex flex-col items-center justify-center text-white text-center shadow-[inset_0_0_30px_rgba(0,0,0,0.45)]"
           :style="{ background: `radial-gradient(circle at 30% 20%, ${secondaryColor}, transparent 60%), linear-gradient(135deg, ${primaryColor}, #111)` }"
         >
           <span class="text-[8px] sm:text-[10px] tracking-[0.2em] uppercase opacity-70 mb-2">Playing now</span>
-          <h1 class="text-sm sm:text-xl md:text-2xl font-medium leading-tight">{{ title }}</h1>
-          <h2 class="mt-1 text-[10px] sm:text-sm opacity-90">{{ artist }}</h2>
+          <h1 class="text-sm sm:text-xl md:text-2xl font-medium leading-tight line-clamp-2 px-2">{{ title }}</h1>
+          <h2 class="mt-1 text-[10px] sm:text-sm opacity-90 truncate max-w-[85%]">{{ artist }}</h2>
           <p class="text-[8px] sm:text-[10px] opacity-60">{{ album }} · {{ year }}</p>
           <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-neutral-900 shadow-[inset_0_1px_3px_rgba(255,255,255,0.25)]" />
         </div>
       </div>
 
-      <!-- needle -->
       <img
-        ref="needleRef"
         src="/needle.png"
         alt="Needle"
         draggable="false"
-        class="w-[calc(var(--player-size,650px)*0.4615)] h-[calc(var(--player-size,650px)*0.4615)] absolute select-none z-10 transition-opacity duration-200"
-        :class="isDragging ? 'cursor-grabbing' : 'cursor-grab'"
+        class="w-[calc(var(--player-size,650px)*0.4615)] h-[calc(var(--player-size,650px)*0.4615)] absolute select-none z-10 touch-none transition-transform"
+        :class="isDragging ? 'cursor-grabbing' : 'cursor-grab hover:brightness-110'"
         :style="{
-          left: `${needleLeft}px`,
-          top: `${needleTop}px`,
-          transform: `rotate(${angle}deg)`,
-          transformOrigin: `${PIVOT_X * 100}% ${PIVOT_Y * 100}%`,
-          opacity: isReady ? '1' : '0',
-          pointerEvents: isReady ? 'auto' : 'none',
+          left: '46.77%',
+          top: '-6.92%',
+          transformOrigin: '72% 15%',
+          transform: `rotate(${effectiveAngle}deg)`,
+          transition: isDragging ? 'none' : 'transform 0.6s cubic-bezier(0.25, 1, 0.5, 1)'
         }"
-        @mousedown="onMouseDown"
-        @load="initNeedle"
+        @pointerdown="onNeedlePointerDown"
+        @pointermove="onNeedlePointerMove"
+        @pointerup="onNeedlePointerUp"
+        @pointercancel="onNeedlePointerUp"
       />
     </div>
 
- <!-- Outside progress bar -->
     <div class="fixed bottom-4 sm:bottom-10 left-1/2 -translate-x-1/2 w-[min(92vw,650px)] z-40 flex flex-col gap-1.5 px-3 sm:px-4 pointer-events-auto">
-      <div class="flex justify-between text-xs text-white/60">
-        <span>{{ displayCurrentTime }}</span>
-        <span>{{ displayDuration }}</span>
+      <div class="flex justify-between text-xs text-white/60 font-mono">
+        <span>{{ formatTime(displayProgressMs) }}</span>
+        <span>{{ formatTime(durationMs) }}</span>
       </div>
-      <div class="h-1.5 rounded-full bg-white/15 overflow-hidden">
+
+      <div 
+        class="h-2 rounded-full bg-white/15 overflow-hidden cursor-pointer py-0.5 group"
+        @click="handleProgressBarClick"
+      >
         <div
           class="h-full rounded-full"
+          :class="isDragging ? '' : 'transition-all duration-300'"
           :style="{
-            width: `${trackProgress}%`,
-            background: `linear-gradient(90deg, ${secondaryColor}, ${primaryColor})`,
-            transition: isTouching ? 'none' : 'width 0.4s ease',
+            width: `${effectivePercent}%`,
+            background: `linear-gradient(90deg, ${secondaryColor}, ${primaryColor})`
           }"
         />
       </div>
+
       <div class="flex justify-center mt-2 sm:mt-3">
         <div class="flex items-center justify-center gap-3 sm:gap-4 px-4 sm:px-5 py-1.5 sm:py-2 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl shadow-black/40 pointer-events-auto">
-          <!-- Backward Button -->
           <button
             @click="emit('backward')"
             class="group relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/10 hover:bg-white/25 border border-white/20 transition-all duration-300 hover:scale-110 active:scale-95 text-white/80 hover:text-white cursor-pointer"
@@ -325,7 +194,6 @@ onUnmounted(() => {
             </svg>
           </button>
 
-          <!-- Play / Pause Button -->
           <button
             @click="togglePlay"
             class="group relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-full border border-white/40 shadow-xl transition-all duration-300 hover:scale-110 active:scale-95 text-white overflow-hidden cursor-pointer"
@@ -345,7 +213,6 @@ onUnmounted(() => {
             </svg>
           </button>
 
-          <!-- Forward Button -->
           <button
             @click="emit('forward')"
             class="group relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/10 hover:bg-white/25 border border-white/20 transition-all duration-300 hover:scale-110 active:scale-95 text-white/80 hover:text-white cursor-pointer"
@@ -360,6 +227,5 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
-
   </div>
 </template>
